@@ -1,8 +1,126 @@
 -- Diligent AwesomeWM module
 local diligent = {}
 
+local dkjson = require("dkjson")
+
+-- Helper function to send response back to CLI
+local function send_response(data)
+  local json_response = dkjson.encode(data)
+  if awesome and awesome.emit_signal then
+    awesome.emit_signal("diligent::response", json_response)
+  end
+end
+
+-- Helper function to parse JSON payload
+local function parse_payload(json_str)
+  if not json_str or json_str == "" then
+    return nil, "Empty payload"
+  end
+
+  local data, err = dkjson.decode(json_str)
+  if not data then
+    return nil, "JSON parsing error: " .. (err or "invalid JSON")
+  end
+
+  return data, nil
+end
+
+-- Handler for ping command
+local function handle_ping(json_payload)
+  local payload, err = parse_payload(json_payload)
+  if not payload then
+    send_response({
+      status = "error",
+      message = err,
+      timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+    })
+    return
+  end
+
+  send_response({
+    status = "success",
+    message = "pong",
+    timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+    received_timestamp = payload.timestamp,
+  })
+end
+
+-- Handler for spawn test command
+local function handle_spawn_test(json_payload)
+  local payload, err = parse_payload(json_payload)
+  if not payload then
+    send_response({
+      status = "error",
+      message = err,
+    })
+    return
+  end
+
+  if not payload.command or payload.command == "" then
+    send_response({
+      status = "error",
+      message = "Invalid or empty command",
+    })
+    return
+  end
+
+  -- Mock PID for testing (in real implementation, this would be from awful.spawn)
+  local mock_pid = math.random(1000, 9999)
+
+  send_response({
+    status = "success",
+    command = payload.command,
+    pid = mock_pid,
+    message = "Process spawned (mock)",
+  })
+end
+
+-- Handler for kill test command
+local function handle_kill_test(json_payload)
+  local payload, err = parse_payload(json_payload)
+  if not payload then
+    send_response({
+      status = "error",
+      message = err,
+    })
+    return
+  end
+
+  if not payload.pid then
+    send_response({
+      status = "error",
+      message = "Missing PID",
+    })
+    return
+  end
+
+  if type(payload.pid) ~= "number" then
+    send_response({
+      status = "error",
+      message = "Invalid PID format",
+    })
+    return
+  end
+
+  -- Mock kill operation (in real implementation, this would use posix.kill)
+  local mock_killed = payload.pid > 0 -- Simple mock logic
+
+  send_response({
+    status = "success",
+    pid = payload.pid,
+    killed = mock_killed,
+    message = "Kill signal sent (mock)",
+  })
+end
+
 function diligent.setup()
-  -- TODO: Register signal handlers
+  -- Register signal handlers with awesome
+  if awesome and awesome.connect_signal then
+    awesome.connect_signal("diligent::ping", handle_ping)
+    awesome.connect_signal("diligent::spawn_test", handle_spawn_test)
+    awesome.connect_signal("diligent::kill_test", handle_kill_test)
+  end
+
   return true
 end
 

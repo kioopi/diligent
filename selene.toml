@@ -1,3 +1,7 @@
 # Selene Linter Configuration
 # Note: lua54+awesome std libraries not available in this Selene version
 # Using basic configuration that works with our current Lua code
+
+[rules]
+# Allow undefined awesome global (provided by AwesomeWM runtime)
+undefined_variable = "allow"

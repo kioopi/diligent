@@ -1,5 +1,101 @@
 #!/usr/bin/env lua
--- Diligent CLI entry point
+--[[
+Diligent CLI - Project Workspace Manager for AwesomeWM
+
+Usage: workon <command> [options]
+
+Commands:
+  ping      Test communication with AwesomeWM
+  help      Show this help message
+--]]
+
+-- Add the lua directory to the path so we can require our modules
+package.path = package.path .. ";./lua/?.lua"
+
+local cli_comm = require("cli_communication")
+local dkjson = require("dkjson")
+
 local args = {...}
-print("Diligent v0.1.0 - stub implementation")
-print("Command:", args[1] or "help")
+local command = args[1] or "help"
+
+-- Helper function to print colored output
+local function print_success(msg)
+  print("\027[32m✓\027[0m " .. msg)
+end
+
+local function print_error(msg)
+  print("\027[31m✗\027[0m " .. msg)
+end
+
+local function print_info(msg)
+  print("\027[34mℹ\027[0m " .. msg)
+end
+
+-- Command handlers
+local commands = {}
+
+function commands.help()
+  print("Diligent v0.1.0 - Project Workspace Manager for AwesomeWM")
+  print("")
+  print("Usage: workon <command> [options]")
+  print("")
+  print("Commands:")
+  print("  ping      Test communication with AwesomeWM")
+  print("  help      Show this help message")
+  print("")
+  print("Examples:")
+  print("  workon ping           # Test if AwesomeWM is responsive")
+end
+
+function commands.ping()
+  print_info("Testing communication with AwesomeWM...")
+  
+  -- First check if awesome-client is available
+  local available = cli_comm.check_awesome_available()
+  if not available then
+    print_error("AwesomeWM not available")
+    print("  • Make sure AwesomeWM is running")
+    print("  • Check that awesome-client is in your PATH")
+    print("  • Verify Diligent module is loaded in AwesomeWM config")
+    os.exit(1)
+  end
+  
+  print_success("awesome-client is available")
+  
+  -- Send ping command
+  local payload = {
+    timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+    source = "diligent-cli"
+  }
+  
+  print_info("Sending ping to AwesomeWM...")
+  local success, response = cli_comm.send_command("ping", payload)
+  
+  if not success then
+    print_error("Failed to send ping: " .. response)
+    os.exit(1)
+  end
+  
+  print_success("Ping sent successfully")
+  print_info("Response: " .. response)
+  
+  -- Note: In a full implementation, we would wait for and parse the response
+  -- For now, we just verify the command was sent
+  print("")
+  print("Note: This is a basic communication test.")
+  print("Full response handling will be implemented in the next phase.")
+end
+
+-- Main execution
+if commands[command] then
+  local status, err = pcall(commands[command])
+  if not status then
+    print_error("Command failed: " .. err)
+    os.exit(1)
+  end
+else
+  print_error("Unknown command: " .. command)
+  print("")
+  commands.help()
+  os.exit(1)
+end
