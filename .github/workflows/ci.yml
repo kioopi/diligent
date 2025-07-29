@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    strategy:
+      matrix:
+        luaVersion: ['5.3', '5.4']
+    
+    steps:
+    - name: Install System Dependencies
+      run: |
+        pacman -Syu --noconfirm git awesome luarocks stylua selene
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Lua
+      uses: leafo/gh-actions-lua@v10
+      with:
+        luaVersion: ${{ matrix.luaVersion }}
+
+    - name: Install Lua Dependencies
+      run: |
+        luarocks install busted
+        luarocks install luacov
+        luarocks install --deps-only diligent-scm-0.rockspec
+
+    - name: Lint Code
+      run: make lint
+
+    - name: Check Formatting
+      run: make fmt-check
+
+    - name: Run Tests with Coverage
+      run: make test
+
+    - name: Validate Coverage Threshold
+      run: |
+        echo "Validating coverage threshold..."
+        if [ -f luacov.report.out ]; then
+          COVERAGE=$(awk '/^Total/ { gsub(/%/, "", $2); print int($2) }' luacov.report.out)
+          MIN_COVERAGE=60
+          echo "Coverage: ${COVERAGE}%, Required: ${MIN_COVERAGE}%"
+          if [ "$COVERAGE" -lt "$MIN_COVERAGE" ]; then
+            echo "ERROR: Coverage below threshold"
+            exit 1
+          fi
+        else
+          echo "ERROR: Coverage report not found"
+          exit 1
+        fi

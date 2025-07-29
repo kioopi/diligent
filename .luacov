@@ -1,0 +1,4 @@
+exclude = {
+  "spec/"
+}
+coverage_threshold = 60

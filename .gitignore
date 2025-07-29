@@ -1,0 +1,18 @@
+# LuaRocks
+*.rock
+*.src.rock
+lua_modules/
+.luarocks/
+
+# Build artifacts  
+luacov.*.out
+luacov.report.out
+luacov.stats.out
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+debug.log

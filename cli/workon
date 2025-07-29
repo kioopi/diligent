@@ -1,0 +1,5 @@
+#!/usr/bin/env lua
+-- Diligent CLI entry point
+local args = {...}
+print("Diligent v0.1.0 - stub implementation")
+print("Command:", args[1] or "help")
