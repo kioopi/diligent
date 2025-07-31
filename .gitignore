@@ -4,7 +4,7 @@
 lua_modules/
 .luarocks/
 
-# Build artifacts  
+# Build artifacts
 luacov.*.out
 luacov.report.out
 luacov.stats.out
@@ -16,3 +16,7 @@ Thumbs.db
 # Logs
 *.log
 debug.log
+
+# Notes dir
+.notes/
+
