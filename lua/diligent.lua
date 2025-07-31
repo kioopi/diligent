@@ -3,9 +3,11 @@ local diligent = {}
 
 local dkjson = require("dkjson")
 
--- Helper function to send response back to CLI
+-- Helper function to send response back to CLI via signal
 local function send_response(data)
   local json_response = dkjson.encode(data)
+
+  -- Emit signal for signal-based communication
   if awesome and awesome.emit_signal then
     awesome.emit_signal("diligent::response", json_response)
   end

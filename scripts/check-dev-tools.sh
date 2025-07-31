@@ -29,7 +29,7 @@ check_command() {
     local cmd="$1"
     local description="$2"
     local version_flag="${3:---version}"
-    
+
     if command -v "$cmd" >/dev/null 2>&1; then
         local version
         version=$($cmd $version_flag 2>/dev/null | head -n1 || echo "version unknown")
@@ -46,7 +46,7 @@ check_command() {
 check_lua_module() {
     local module="$1"
     local description="$2"
-    
+
     if lua -e "require('$module')" >/dev/null 2>&1; then
         # Try to get version if possible
         local version
@@ -104,7 +104,7 @@ fi
 if [[ -x "cli/workon" ]]; then
     echo -e "  ${GREEN}✓${NC} CLI script: executable"
     # Test CLI
-    if ./cli/workon test >/dev/null 2>&1; then
+    if ./cli/workon ping >/dev/null 2>&1; then
         echo -e "  ${GREEN}✓${NC} CLI functionality: basic test passed"
     else
         echo -e "  ${RED}✗${NC} CLI functionality: basic test failed"
@@ -129,7 +129,7 @@ if [[ $OVERALL_STATUS -eq 0 ]]; then
 else
     echo -e "${RED}❌ Some checks failed. Please fix the issues below:${NC}"
     echo ""
-    
+
     if [[ ${#MISSING_TOOLS[@]} -gt 0 ]]; then
         echo -e "${YELLOW}Missing system tools:${NC}"
         for tool in "${MISSING_TOOLS[@]}"; do
@@ -150,13 +150,13 @@ else
         done
         echo ""
     fi
-    
+
     if [[ ${#MISSING_DEPS[@]} -gt 0 ]]; then
         echo -e "${YELLOW}Missing Lua dependencies:${NC}"
         echo "  • Install all dependencies: luarocks install --deps-only diligent-dev-scm-0.rockspec"
         echo ""
     fi
-    
+
     echo -e "${BLUE}For detailed setup instructions, see: docs/developer-guide.md${NC}"
 fi
 

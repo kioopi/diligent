@@ -8,12 +8,10 @@ Commands:
   ping      Test communication with AwesomeWM
   help      Show this help message
 --]]
+--
 
--- Add the lua directory to the path so we can require our modules
-package.path = package.path .. ";./lua/?.lua"
-
-local cli_comm = require("cli_communication")
-local dkjson = require("dkjson")
+-- Use D-Bus communication instead of shell-based awesome-client
+local dbus = require("dbus_communication")
 
 local args = {...}
 local command = args[1] or "help"
@@ -48,42 +46,50 @@ function commands.help()
 end
 
 function commands.ping()
-  print_info("Testing communication with AwesomeWM...")
-  
-  -- First check if awesome-client is available
-  local available = cli_comm.check_awesome_available()
-  if not available then
-    print_error("AwesomeWM not available")
-    print("  • Make sure AwesomeWM is running")
-    print("  • Check that awesome-client is in your PATH")
-    print("  • Verify Diligent module is loaded in AwesomeWM config")
+  -- First check if AwesomeWM is available via D-Bus
+  local awesome_success, result = pcall(dbus.check_awesome_available)
+  local available = awesome_success and result
+
+  if not awesome_success then
+    print_error("Error checking AwesomeWM availability: " .. tostring(result))
     os.exit(1)
   end
-  
-  print_success("awesome-client is available")
-  
-  -- Send ping command
+
+  if not available then
+    print_error("AwesomeWM not available via D-Bus")
+    print("  • Make sure AwesomeWM is running")
+    print("  • Check that D-Bus session bus is available")
+    print("  • Verify AwesomeWM has D-Bus support enabled")
+    os.exit(1)
+  end
+
+  -- Send ping command and wait for response
   local payload = {
     timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
     source = "diligent-cli"
   }
-  
-  print_info("Sending ping to AwesomeWM...")
-  local success, response = cli_comm.send_command("ping", payload)
-  
+
+  local success, response = dbus.send_ping(payload)
+
   if not success then
-    print_error("Failed to send ping: " .. response)
+    print_error("Failed to get response: " .. response)
+    print("")
+    print("Troubleshooting:")
+    print("  • Ensure the Diligent module is loaded in your AwesomeWM rc.lua:")
+    print("    local diligent = require('diligent')")
+    print("    diligent.setup()")
+    print("  • Check that the lua/ directory is in your Lua path")
     os.exit(1)
   end
-  
-  print_success("Ping sent successfully")
+
+  print_success("Ping successful!")
   print_info("Response: " .. response)
-  
-  -- Note: In a full implementation, we would wait for and parse the response
-  -- For now, we just verify the command was sent
-  print("")
-  print("Note: This is a basic communication test.")
-  print("Full response handling will be implemented in the next phase.")
+
+  -- Check if response is valid JSON
+  local parse_success, error = dbus.parse_response(response)
+  if not parse_success then
+    print_error("Could not JSON parse response " .. tostring(error))
+  end
 end
 
 -- Main execution

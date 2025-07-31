@@ -9,7 +9,7 @@ description = {
    license = "MIT"
 }
 dependencies = {
-   "lua >= 5.3, < 5.5",
+   "lua >= 5.4, < 5.5",
    "luafilesystem >= 1.8.0",
    "dkjson >= 2.5",
    "luaposix >= 35.0"

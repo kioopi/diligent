@@ -2,7 +2,7 @@
 
 LUA_VERSION ?= 5.4
 STYLUA = stylua
-SELENE = selene  
+SELENE = selene
 BUSTED = busted
 
 all:
@@ -18,7 +18,7 @@ test:
 
 lint:
 	@echo "Running linter..."
-	@$(SELENE) lua/ cli/
+	@$(SELENE) lua/* cli/*
 
 fmt:
 	@echo "Formatting code..."
