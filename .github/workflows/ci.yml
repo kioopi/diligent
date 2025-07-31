@@ -37,7 +37,7 @@ jobs:
         beautiful.init()
         
         -- Add Diligent lua path
-        package.path = package.path .. ';/github/workspace/lua/?.lua'
+        package.path = package.path .. ';' .. os.getenv('GITHUB_WORKSPACE') .. '/lua/?.lua'
         
         -- Setup Diligent
         local diligent = require('diligent')
