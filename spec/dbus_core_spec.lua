@@ -51,7 +51,6 @@ describe("dbus_core", function()
   end)
   describe("init_lgi", function()
     it("should require and return LGI components", function()
-      -- This test will fail initially since init_lgi doesn't exist yet
       local lgi, GLib, Gio = dbus_core.init_lgi()
 
       assert.is_not_nil(lgi)
