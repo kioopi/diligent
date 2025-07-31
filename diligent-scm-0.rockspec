@@ -15,6 +15,7 @@ dependencies = {
    "luaposix >= 35.0",
    "lua_cliargs >= 3.0",
    "penlight >= 1.5.0"
+   "lua-livr >= 2.0",
 }
 build = {
    type = "builtin",
