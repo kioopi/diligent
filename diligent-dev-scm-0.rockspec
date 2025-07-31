@@ -15,6 +15,9 @@ dependencies = {
    "luafilesystem >= 1.8.0",
    "dkjson >= 2.5",
    "luaposix >= 35.0",
+   "luaposix >= 35.0",
+   "lua_cliargs >= 3.0",
+   "penlight >= 1.5.0"
    -- Development dependencies
    "busted >= 2.0",
    "luacov >= 0.15.0",

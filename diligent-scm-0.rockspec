@@ -12,13 +12,18 @@ dependencies = {
    "lua >= 5.4, < 5.5",
    "luafilesystem >= 1.8.0",
    "dkjson >= 2.5",
-   "luaposix >= 35.0"
+   "luaposix >= 35.0",
+   "lua_cliargs >= 3.0",
+   "penlight >= 1.5.0"
 }
 build = {
    type = "builtin",
    modules = {
       diligent = "lua/diligent.lua",
-      json_utils = "lua/json_utils.lua"
+      json_utils = "lua/json_utils.lua",
+      cli_printer = "lua/cli_printer.lua",
+      dbus_communication = "lua/dbus_communication.lua",
+      ["commands.ping"] = "lua/commands/ping.lua"
    },
    install = {
       bin = {
