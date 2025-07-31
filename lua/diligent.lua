@@ -1,11 +1,22 @@
 -- Diligent AwesomeWM module
 local diligent = {}
 
-local dkjson = require("dkjson")
+local json_utils = require("json_utils")
 
 -- Helper function to send response back to CLI via signal
 local function send_response(data)
-  local json_response = dkjson.encode(data)
+  local success, json_response = json_utils.encode(data)
+  if not success then
+    -- If encoding fails, send error response
+    success, json_response = json_utils.encode({
+      status = "error",
+      message = "Response encoding failed: " .. json_response,
+      timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+    })
+    if not success then
+      return -- Cannot even encode error response
+    end
+  end
 
   -- Emit signal for signal-based communication
   if awesome and awesome.emit_signal then
@@ -19,9 +30,9 @@ local function parse_payload(json_str)
     return nil, "Empty payload"
   end
 
-  local data, err = dkjson.decode(json_str)
-  if not data then
-    return nil, "JSON parsing error: " .. (err or "invalid JSON")
+  local success, data = json_utils.decode(json_str)
+  if not success then
+    return nil, data -- data contains error message
   end
 
   return data, nil

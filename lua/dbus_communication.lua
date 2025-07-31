@@ -123,12 +123,12 @@ end
 
 -- Send a command to AwesomeWM via D-Bus (compatible with cli_communication.lua interface)
 function dbus_comm.send_command(command, payload)
-  local dkjson = require("dkjson")
+  local json_utils = require("json_utils")
 
   -- Encode payload as JSON
-  local status, json_payload = pcall(dkjson.encode, payload)
+  local status, json_payload = json_utils.encode(payload)
   if not status then
-    return false, "JSON encoding error: " .. (json_payload or "unknown error")
+    return false, json_payload
   end
 
   -- Create Lua code to emit signal
@@ -178,19 +178,9 @@ end
 
 -- Parse JSON response from AwesomeWM (same as cli_communication.lua)
 function dbus_comm.parse_response(response)
-  local dkjson = require("dkjson")
+  local json_utils = require("json_utils")
 
-  if not response or response == "" then
-    return false, "empty response"
-  end
-
-  -- Try to decode JSON
-  local data, err = dkjson.decode(response)
-  if not data then
-    return false, "JSON parsing error: " .. (err or "invalid JSON")
-  end
-
-  return true, data
+  return json_utils.decode(response)
 end
 
 return dbus_comm

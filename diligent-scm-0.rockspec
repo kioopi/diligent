@@ -17,7 +17,8 @@ dependencies = {
 build = {
    type = "builtin",
    modules = {
-      diligent = "lua/diligent.lua"
+      diligent = "lua/diligent.lua",
+      json_utils = "lua/json_utils.lua"
    },
    install = {
       bin = {
