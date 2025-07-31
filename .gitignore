@@ -17,6 +17,7 @@ Thumbs.db
 *.log
 debug.log
 
-# Notes dir
+# local directories
 .notes/
+devdocs/
 

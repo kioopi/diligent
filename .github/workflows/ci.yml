@@ -10,26 +10,44 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     container: archlinux:latest
-    strategy:
-      matrix:
-        luaVersion: ['5.4']
 
     steps:
     - name: Install System Dependencies
       run: |
-        pacman -Syu --noconfirm sudo git awesome luarocks stylua selene
+        pacman -Syu --noconfirm sudo git make lua awesome luarocks stylua selene lua-lgi gcc dbus
 
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Lua
-      uses: leafo/gh-actions-lua@v10
-      with:
-        luaVersion: ${{ matrix.luaVersion }}
-
     - name: Install Lua Dependencies
       run: |
         luarocks install --deps-only diligent-dev-scm-0.rockspec
+
+    - name: Setup AwesomeWM Config
+      run: |
+        mkdir -p ~/.config/awesome
+        # Create minimal rc.lua with diligent setup
+        cat > ~/.config/awesome/rc.lua << 'EOF'
+        -- Minimal AwesomeWM config for CI testing
+        local awful = require("awful")
+        local beautiful = require("beautiful")
+        local naughty = require("naughty")
+        
+        -- Initialize theme
+        beautiful.init()
+        
+        -- Add Diligent lua path
+        package.path = package.path .. ';/github/workspace/lua/?.lua'
+        
+        -- Setup Diligent
+        local diligent = require('diligent')
+        diligent.setup()
+        
+        -- Basic screen setup
+        awful.screen.connect_for_each_screen(function(s)
+          -- Minimal setup for testing
+        end)
+        EOF
 
     - name: Lint Code
       run: make lint
@@ -38,7 +56,9 @@ jobs:
       run: make fmt-check
 
     - name: Run Tests with Coverage
-      run: make test
+      run: |
+        eval $(dbus-launch --sh-syntax)
+        make test
 
     - name: Validate Coverage Threshold
       run: |
