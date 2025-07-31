@@ -8,100 +8,43 @@ Commands:
   ping      Test communication with AwesomeWM
   help      Show this help message
 --]]
---
 
--- Use D-Bus communication instead of shell-based awesome-client
-local dbus = require("dbus_communication")
+-- Add lua directory to package path
+local script_dir = arg[0]:match("(.+)/[^/]+$") or "."
+package.path = script_dir .. "/../lua/?.lua;" .. package.path
 
-local args = {...}
-local command = args[1] or "help"
+local T = require 'pl.tablex'
 
--- Helper function to print colored output
-local function print_success(msg)
-  print("\027[32m✓\027[0m " .. msg)
-end
+-- Setup CLI with lua_cliargs
+local cli = require("cliargs")
 
-local function print_error(msg)
-  print("\027[31m✗\027[0m " .. msg)
-end
+cli:set_name("workon")
+cli:set_description("Diligent v0.1.0 - Project Workspace Manager for AwesomeWM")
 
-local function print_info(msg)
-  print("\027[34mℹ\027[0m " .. msg)
-end
+-- Add global flags
+cli:flag("-v, --verbose", "Enable verbose output")
+cli:flag("--version", "Show version information", function()
+  print("Diligent v0.1.0")
+  os.exit(0)
+end)
 
--- Command handlers
-local commands = {}
+-- Define ping command
 
-function commands.help()
-  print("Diligent v0.1.0 - Project Workspace Manager for AwesomeWM")
-  print("")
-  print("Usage: workon <command> [options]")
-  print("")
-  print("Commands:")
-  print("  ping      Test communication with AwesomeWM")
-  print("  help      Show this help message")
-  print("")
-  print("Examples:")
-  print("  workon ping           # Test if AwesomeWM is responsive")
-end
+cli:command("ping", "Test communication with AwesomeWM"):file("lua/commands/ping.lua")
 
-function commands.ping()
-  -- First check if AwesomeWM is available via D-Bus
-  local awesome_success, result = pcall(dbus.check_awesome_available)
-  local available = awesome_success and result
+-- Parse and execute
+local args, err = cli:parse(arg)
 
-  if not awesome_success then
-    print_error("Error checking AwesomeWM availability: " .. tostring(result))
-    os.exit(1)
-  end
+if not args and err then
+  -- Handle parse errors
+  print(string.format("%s: %s\n", cli.name, err))
 
-  if not available then
-    print_error("AwesomeWM not available via D-Bus")
-    print("  • Make sure AwesomeWM is running")
-    print("  • Check that D-Bus session bus is available")
-    print("  • Verify AwesomeWM has D-Bus support enabled")
-    os.exit(1)
-  end
-
-  -- Send ping command and wait for response
-  local payload = {
-    timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-    source = "diligent-cli"
-  }
-
-  local success, response = dbus.send_ping(payload)
-
-  if not success then
-    print_error("Failed to get response: " .. response)
-    print("")
-    print("Troubleshooting:")
-    print("  • Ensure the Diligent module is loaded in your AwesomeWM rc.lua:")
-    print("    local diligent = require('diligent')")
-    print("    diligent.setup()")
-    print("  • Check that the lua/ directory is in your Lua path")
-    os.exit(1)
-  end
-
-  print_success("Ping successful!")
-  print_info("Response: " .. response)
-
-  -- Check if response is valid JSON
-  local parse_success, error = dbus.parse_response(response)
-  if not parse_success then
-    print_error("Could not JSON parse response " .. tostring(error))
-  end
-end
-
--- Main execution
-if commands[command] then
-  local status, err = pcall(commands[command])
-  if not status then
-    print_error("Command failed: " .. err)
-    os.exit(1)
-  end
-else
-  print_error("Unknown command: " .. command)
-  print("")
-  commands.help()
+  --cli:print_help()
   os.exit(1)
+end
+
+if args and T.size(args) == 0 then
+  -- No command provided, show help
+  cli:print_help()
+  os.exit(0)
 end
