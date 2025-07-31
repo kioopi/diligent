@@ -32,17 +32,17 @@ jobs:
         local awful = require("awful")
         local beautiful = require("beautiful")
         local naughty = require("naughty")
-        
+
         -- Initialize theme
         beautiful.init()
-        
+
         -- Add Diligent lua path
         package.path = package.path .. ';' .. os.getenv('GITHUB_WORKSPACE') .. '/lua/?.lua'
-        
+
         -- Setup Diligent
         local diligent = require('diligent')
         diligent.setup()
-        
+
         -- Basic screen setup
         awful.screen.connect_for_each_screen(function(s)
           -- Minimal setup for testing
