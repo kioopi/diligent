@@ -28,9 +28,10 @@ cli:flag("--version", "Show version information", function()
   os.exit(0)
 end)
 
--- Define ping command
+-- Define commands
 
 cli:command("ping", "Test communication with AwesomeWM"):file("cli/commands/ping.lua")
+cli:command("validate", "Validate project files"):file("cli/commands/validate.lua")
 
 -- Parse and execute
 local args, err = cli:parse(arg)
