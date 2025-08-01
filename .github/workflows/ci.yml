@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   lint-and-test:
@@ -12,66 +12,68 @@ jobs:
     container: archlinux:latest
 
     steps:
-    - name: Install System Dependencies
-      run: |
-        pacman -Syu --noconfirm sudo git make lua awesome luarocks stylua selene lua-lgi gcc dbus
+      - name: Install System Dependencies
+        run: |
+          pacman -Syu --noconfirm sudo git make lua awesome luarocks stylua selene lua-lgi gcc dbus
 
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install Lua Dependencies
-      run: |
-        luarocks install --deps-only diligent-dev-scm-0.rockspec
+      - name: Install Lua Dependencies
+        run: |
+          luarocks install --deps-only diligent-dev-scm-0.rockspec
 
-    - name: Setup AwesomeWM Config
-      run: |
-        mkdir -p ~/.config/awesome
-        # Create minimal rc.lua with diligent setup
-        cat > ~/.config/awesome/rc.lua << 'EOF'
-        -- Minimal AwesomeWM config for CI testing
-        local awful = require("awful")
-        local beautiful = require("beautiful")
-        local naughty = require("naughty")
+      - name: Setup AwesomeWM Config
+        run: |
+          mkdir -p ~/.config/awesome
+          # Create minimal rc.lua with diligent setup
+          cat > ~/.config/awesome/rc.lua << 'EOF'
+          -- Minimal AwesomeWM config for CI testing
+          pcall(require, "luarocks.loader")
+          local awful = require("awful")
+          local beautiful = require("beautiful")
+          local naughty = require("naughty")
 
-        -- Initialize theme
-        beautiful.init()
+          -- Initialize theme
+          beautiful.init()
 
-        -- Add Diligent lua path
-        package.path = package.path .. ';' .. os.getenv('GITHUB_WORKSPACE') .. '/lua/?.lua'
+          -- Add Diligent lua path
+          package.path = package.path .. ';' .. os.getenv('GITHUB_WORKSPACE') .. '/lua/?.lua;' ..
+                          os.getenv('GITHUB_WORKSPACE') .. '/lua/?/?.lua'
 
-        -- Setup Diligent
-        local diligent = require('diligent')
-        diligent.setup()
+          -- Setup Diligent
+          local diligent = require('diligent')
+          diligent.setup()
 
-        -- Basic screen setup
-        awful.screen.connect_for_each_screen(function(s)
-          -- Minimal setup for testing
-        end)
-        EOF
+          -- Basic screen setup
+          awful.screen.connect_for_each_screen(function(s)
+            -- Minimal setup for testing
+          end)
+          EOF
 
-    - name: Lint Code
-      run: make lint
+      - name: Lint Code
+        run: make lint
 
-    - name: Check Formatting
-      run: make fmt-check
+      - name: Check Formatting
+        run: make fmt-check
 
-    - name: Run Tests with Coverage
-      run: |
-        eval $(dbus-launch --sh-syntax)
-        make test
+      - name: Run Tests with Coverage
+        run: |
+          eval $(dbus-launch --sh-syntax)
+          make test
 
-    - name: Validate Coverage Threshold
-      run: |
-        echo "Validating coverage threshold..."
-        if [ -f luacov.report.out ]; then
-          COVERAGE=$(awk '/^Total/ { gsub(/%/, "", $2); print int($2) }' luacov.report.out)
-          MIN_COVERAGE=60
-          echo "Coverage: ${COVERAGE}%, Required: ${MIN_COVERAGE}%"
-          if [ "$COVERAGE" -lt "$MIN_COVERAGE" ]; then
-            echo "ERROR: Coverage below threshold"
+      - name: Validate Coverage Threshold
+        run: |
+          echo "Validating coverage threshold..."
+          if [ -f luacov.report.out ]; then
+            COVERAGE=$(awk '/^Total/ { gsub(/%/, "", $2); print int($2) }' luacov.report.out)
+            MIN_COVERAGE=60
+            echo "Coverage: ${COVERAGE}%, Required: ${MIN_COVERAGE}%"
+            if [ "$COVERAGE" -lt "$MIN_COVERAGE" ]; then
+              echo "ERROR: Coverage below threshold"
+              exit 1
+            fi
+          else
+            echo "ERROR: Coverage report not found"
             exit 1
           fi
-        else
-          echo "ERROR: Coverage report not found"
-          exit 1
-        fi
