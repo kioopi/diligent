@@ -11,12 +11,13 @@ A declarative, per-project workspace manager for AwesomeWM.
 
 **Current Features:**
 - ✅ Fast D-Bus communication between CLI and AwesomeWM (~12-16ms response time)
-- ✅ Working `workon ping` command for testing connectivity  
+- ✅ **DSL Validation System**: Complete project configuration validation with helpful error messages
+- ✅ **Project Validation**: `workon validate` command for immediate DSL feedback  
 - ✅ **Modular Architecture**: Clean handler system with lua-LIVR validation
 - ✅ **Dual Communication Layer**: Async signals (`emit_command`) and sync dispatch (`dispatch_command`)
 - ✅ **Robust Error Handling**: Structured validation and error responses
 - ✅ **Handler Registration System**: Extensible architecture for new commands
-- ✅ Comprehensive test suite with >60% coverage
+- ✅ Comprehensive test suite with >95% coverage (387+ tests)
 
 ## Installation
 
@@ -116,6 +117,246 @@ Test the D-Bus communication:
 chmod +x cli/workon
 ```
 
+## Usage Guide
+
+### Available Commands
+
+Diligent provides a growing set of CLI commands for managing workspace projects:
+
+```bash
+# Test connectivity with AwesomeWM
+workon ping
+
+# Validate project configuration files
+workon validate <project-name>
+workon validate --file <path-to-dsl-file>
+
+# Get help and see all available commands
+workon --help
+```
+
+### Project Configuration Validation
+
+Diligent includes a powerful validation system that helps you catch configuration errors early:
+
+```bash
+# Validate a project by name (looks in ~/.config/diligent/projects/)
+workon validate my-project
+
+# Validate a specific DSL file
+workon validate --file ~/my-projects/webapp.lua
+
+# Test with example files
+workon validate --file lua/dsl/examples/web-development.lua
+```
+
+**Successful validation output:**
+```
+✓ DSL syntax valid
+✓ Required fields present (name, resources)
+✓ Project name: "web-development"
+✓ Resource 'editor': app helper valid (tag: relative offset 0)
+✓ Resource 'browser': app helper valid (tag: absolute tag 3)
+✓ Resource 'database': app helper valid (tag: named "db")
+✓ Hooks configured: start, stop
+
+✓ Validation passed: 9 checks passed, 0 errors
+```
+
+**Error example output:**
+```
+✗ Validation failed:
+✗   resource 'editor': cmd field is required
+```
+
+### Configuration Directory
+
+Diligent looks for project configuration files in:
+```
+~/.config/diligent/projects/
+├── my-webapp.lua
+├── research-notes.lua
+└── client-work.lua
+```
+
+## DSL Reference
+
+Diligent uses a declarative Domain Specific Language (DSL) written in Lua for defining project workspaces. Each project is defined as a Lua file that returns a configuration table.
+
+### Basic Structure
+
+Every Diligent project file follows this structure:
+
+```lua
+return {
+  name = "project-name",        -- Required: project identifier
+  
+  resources = {                 -- Required: applications to launch
+    -- Resource definitions go here
+  },
+  
+  hooks = {                     -- Optional: lifecycle commands
+    -- Hook definitions go here  
+  }
+}
+```
+
+### Resources
+
+Resources define the applications that make up your workspace. Currently, Diligent supports the `app{}` resource type:
+
+#### App Resources
+
+The `app{}` helper creates application resources with the following fields:
+
+```lua
+resources = {
+  editor = app({
+    cmd = "nvim ~/project",     -- Required: command to execute
+    dir = "~/project",          -- Optional: working directory
+    tag = 1,                    -- Optional: tag specification (default: 0)
+    reuse = false              -- Optional: reuse existing windows (default: false)
+  })
+}
+```
+
+**Field Details:**
+
+- **`cmd`** (string, required): Shell command to execute
+- **`dir`** (string, optional): Working directory for the command
+- **`tag`** (number|string, optional): Tag placement specification (see Tag System below)
+- **`reuse`** (boolean, optional): Whether to reuse existing application windows
+
+### Tag System
+
+Diligent provides three ways to specify where applications should be placed:
+
+#### 1. Relative Tags (Numbers)
+Place applications relative to a base tag:
+
+```lua
+tag = 0   -- Current tag (base + 0)
+tag = 1   -- Next tag (base + 1)  
+tag = 2   -- Two tags ahead (base + 2)
+tag = -1  -- Previous tag (base - 1) [future feature]
+```
+
+#### 2. Absolute Tags (String Numbers)
+Place applications on specific numbered tags:
+
+```lua
+tag = "1"  -- Always on tag 1
+tag = "2"  -- Always on tag 2
+tag = "9"  -- Always on tag 9 (max: 9)
+```
+
+#### 3. Named Tags (Strings)
+Create or use named tags for logical grouping:
+
+```lua
+tag = "editor"      -- Create/use tag named "editor"
+tag = "browser"     -- Create/use tag named "browser"  
+tag = "database"    -- Create/use tag named "database"
+```
+
+**Named tag rules:**
+- Must start with a letter
+- Can contain letters, numbers, underscore, or dash
+- Examples: `"dev"`, `"web_browser"`, `"client-work"`
+
+### Hooks
+
+Hooks allow you to run commands before and after workspace operations:
+
+```lua
+hooks = {
+  start = "docker-compose up -d && sleep 2",  -- Run before opening applications
+  stop = "docker-compose down"               -- Run when closing workspace
+}
+```
+
+**Available hooks:**
+- **`start`**: Execute before launching applications
+- **`stop`**: Execute when shutting down workspace
+
+### Complete Examples
+
+#### Minimal Project
+```lua
+return {
+  name = "quick-notes",
+  
+  resources = {
+    editor = app({
+      cmd = "gedit ~/notes/scratch.txt",
+      tag = 0,      -- Current tag
+      reuse = true  -- Reuse existing window
+    })
+  }
+}
+```
+
+#### Web Development Project
+```lua
+return {
+  name = "webapp-dev",
+  
+  resources = {
+    -- Code editor on current tag
+    editor = app({
+      cmd = "code ~/projects/webapp",
+      dir = "~/projects/webapp", 
+      tag = 0,      -- Relative: current tag
+      reuse = true
+    }),
+    
+    -- Terminal for development server
+    terminal = app({
+      cmd = "alacritty -e npm run dev",
+      dir = "~/projects/webapp",
+      tag = 1       -- Relative: next tag
+    }),
+    
+    -- Browser for testing
+    browser = app({
+      cmd = "firefox --new-window http://localhost:3000",
+      tag = "3",    -- Absolute: always tag 3
+      reuse = true
+    }),
+    
+    -- Database tools on named tag
+    database = app({
+      cmd = "dbeaver",
+      tag = "db",   -- Named: create/use "db" tag
+      reuse = true
+    })
+  },
+  
+  hooks = {
+    start = "docker-compose up -d && sleep 2",
+    stop = "docker-compose down"
+  }
+}
+```
+
+### Validation and Error Handling
+
+Diligent provides comprehensive validation with helpful error messages:
+
+**Common validation errors:**
+- `"name field is required"` - Missing project name
+- `"cmd field is required"` - Missing command in app resource
+- `"absolute tag must be between 1 and 9, got 10"` - Invalid absolute tag
+- `"invalid tag name format: must start with letter..."` - Invalid named tag format
+
+**Test validation with error examples:**
+```bash
+# Test different error scenarios
+workon validate --file lua/dsl/examples/errors/missing-required-fields.lua
+workon validate --file lua/dsl/examples/errors/invalid-tag-specifications.lua  
+workon validate --file lua/dsl/examples/errors/type-validation-errors.lua
+```
+
 ### Architecture Overview
 
 Diligent features a **production-ready modular architecture**:
@@ -150,6 +391,10 @@ luarocks install --deps-only diligent-dev-scm-0.rockspec
 # Verify setup and test CLI
 ./scripts/check-dev-tools.sh
 ./cli/workon ping
+
+# Try the DSL validation system
+./cli/workon validate --file lua/dsl/examples/web-development.lua
+./cli/workon validate --file lua/dsl/examples/errors/missing-required-fields.lua
 
 # Run development tasks
 make test lint fmt

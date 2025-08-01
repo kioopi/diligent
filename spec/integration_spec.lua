@@ -1,7 +1,7 @@
 local assert = require("luassert")
 local dbus = require("dbus_communication")
 
-pr = require('pl.pretty')
+pr = require("pl.pretty")
 
 function print_response(response)
   if type(response) == "table" then
@@ -10,7 +10,6 @@ function print_response(response)
     return tostring(response or "unknown")
   end
 end
-
 
 describe("Integration: CLI to AwesomeWM Communication", function()
   describe("AwesomeWM Environment", function()
@@ -281,7 +280,6 @@ describe("Integration: CLI to AwesomeWM Communication", function()
       }
 
       local success, response = dbus.dispatch_command("ping", payload)
-
 
       if not success then
         error(
