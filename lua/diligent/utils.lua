@@ -81,7 +81,7 @@ end
 
 -- Send response back to CLI via signal
 function utils.emit_response(data)
-  json_response = utils.encode_response(data)
+  local json_response = utils.encode_response(data)
 
   -- Emit signal for signal-based communication
   if awesome and awesome.emit_signal then

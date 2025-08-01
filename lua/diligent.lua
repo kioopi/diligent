@@ -103,7 +103,7 @@ function diligent.dispatch(signal_name, payload)
 end
 
 function diligent.dispatch_json(signal_name, json_payload)
-  response = diligent.dispatch(signal_name, json_payload)
+  local response = diligent.dispatch(signal_name, json_payload)
 
   return utils.encode_response(response)
 end

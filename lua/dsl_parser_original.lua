@@ -1,4 +1,3 @@
-local lfs = require("lfs")
 local P = require("pl.path")
 local F = require("pl.file")
 
@@ -52,7 +51,7 @@ function dsl_parser.load_dsl_file(filepath)
     return false, "file not found: " .. filepath
   end
 
-  content = F.read(filepath)
+  local content = F.read(filepath)
 
   return dsl_parser.compile_dsl(content, filepath)
 end
