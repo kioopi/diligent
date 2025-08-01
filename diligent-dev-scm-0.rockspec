@@ -16,8 +16,8 @@ dependencies = {
    "dkjson >= 2.5",
    "luaposix >= 35.0",
    "lua_cliargs >= 3.0",
-   "penlight >= 1.5.0"
-   "lua-livr >= 2.0",
+   "penlight >= 1.5.0",
+   "lua-livr >= 0.5",
    -- Development dependencies
    "busted >= 2.0",
    "luacov >= 0.15.0",
