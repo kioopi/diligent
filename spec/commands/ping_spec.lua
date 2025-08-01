@@ -52,7 +52,11 @@ describe("Ping Command Script", function()
       handle:close()
 
       -- Should either load successfully or show dependency error
-      assert.matches("dependency_error", output, "Should inform about missing dependencies")
+      assert.matches(
+        "dependency_error",
+        output,
+        "Should inform about missing dependencies"
+      )
     end)
   end)
 

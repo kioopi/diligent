@@ -67,21 +67,23 @@ function dbus_comm.dispatch_command(command, payload)
   local success, json = dbus_core.execute_lua_code(lua_code)
 
   if not success then
-    return false, {
-      status = "error",
-      message = "Failed to execute command in AwesomeWM",
-      timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-    }
+    return false,
+      {
+        status = "error",
+        message = "Failed to execute command in AwesomeWM",
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+      }
   end
 
   local parsed, result_or_error = json_utils.decode(json)
 
   if not parsed then
-    return false, {
-      status = "error",
-      message = "Failed to parse response: " .. tostring(result_or_error),
-      timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-    }
+    return false,
+      {
+        status = "error",
+        message = "Failed to parse response: " .. tostring(result_or_error),
+        timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+      }
   end
 
   return true, result_or_error

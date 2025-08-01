@@ -6,8 +6,7 @@ local ping_handler = require("diligent.handlers.ping")
 local spawn_test_handler = require("diligent.handlers.spawn_test")
 local kill_test_handler = require("diligent.handlers.kill_test")
 
-diligent.handlers = {
-}
+diligent.handlers = {}
 
 function diligent.register_handler(signal_name, handler)
   diligent.handlers[signal_name] = handler
@@ -19,7 +18,8 @@ end
 -- Connect signal with automatic validation and error handling
 function diligent.connect_signal(signal_name, handler)
   local signal_handler = function(json_payload)
-    local is_valid, payload_or_error = parse_and_validate_payload(json_payload, handler.validator)
+    local is_valid, payload_or_error =
+      parse_and_validate_payload(json_payload, handler.validator)
     if not is_valid then
       utils.emit_response(payload_or_error)
       return false
@@ -61,7 +61,7 @@ end
 function validate_payload(payload, validator)
   if validator then
     local validated_payload, validation_errors =
-    utils.validate_payload(payload, validator)
+      utils.validate_payload(payload, validator)
     if not validated_payload then
       return false, utils.format_validation_error_response(validation_errors)
     end
@@ -79,15 +79,17 @@ function parse_if_json_and_validate(payload, validator)
   return validate_payload(payload, validator)
 end
 
-
 function diligent.dispatch(signal_name, payload)
   local handler = diligent.handlers[signal_name]
 
   if not handler then
-    return utils.format_error_response("No handler registered for: " .. signal_name)
+    return utils.format_error_response(
+      "No handler registered for: " .. signal_name
+    )
   end
 
-  local is_valid, payload_or_error = parse_if_json_and_validate(payload, handler.validator)
+  local is_valid, payload_or_error =
+    parse_if_json_and_validate(payload, handler.validator)
   if not is_valid then
     return payload_or_error
   end

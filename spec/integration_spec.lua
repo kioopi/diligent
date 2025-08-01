@@ -243,7 +243,10 @@ describe("Integration: CLI to AwesomeWM Communication", function()
       assert.is_not_nil(file, "Signal handler should create test file")
       local test_result = file and file:read("*a")
       assert.is_not_nil(test_result, "Test file should contain data")
-      assert.is_not_nil(file and file:close(), "Should close test file properly")
+      assert.is_not_nil(
+        file and file:close(),
+        "Should close test file properly"
+      )
       os.remove(test_file)
 
       assert.matches(

@@ -8,11 +8,12 @@ local mock_handler = {
     command = { "required", "string" },
   }),
   execute = function(payload)
-    return true, {
-      status = "success",
-      message = "Command executed",
-      command = payload.command,
-    }
+    return true,
+      {
+        status = "success",
+        message = "Command executed",
+        command = payload.command,
+      }
   end,
 }
 
@@ -145,7 +146,7 @@ describe("Diligent Refactored Module", function()
 
   describe("dispatch", function()
     it("should dispatch the command and return success response", function()
-      diligent.register_handler('test::command', mock_handler)
+      diligent.register_handler("test::command", mock_handler)
       local payload = { command = "echo test" }
       local response = diligent.dispatch("test::command", payload)
 
@@ -159,18 +160,24 @@ describe("Diligent Refactored Module", function()
       local response = diligent.dispatch("test::command", payload)
 
       assert.are.equal("error", response.status)
-      assert.are.equal("No handler registered for: test::command", response.message)
+      assert.are.equal(
+        "No handler registered for: test::command",
+        response.message
+      )
     end)
 
-    it("should dispatch and return error response for an invalid payload", function()
-      diligent.register_handler('test::command', mock_handler)
-      local payload = { no_comand = "echo test" }
-      local response = diligent.dispatch("test::command", payload)
+    it(
+      "should dispatch and return error response for an invalid payload",
+      function()
+        diligent.register_handler("test::command", mock_handler)
+        local payload = { no_comand = "echo test" }
+        local response = diligent.dispatch("test::command", payload)
 
-      assert.are.equal("error", response.status)
-      assert.are.equal("Validation failed", response.message)
-      assert.are.equal("REQUIRED", response.errors.command)
-    end)
+        assert.are.equal("error", response.status)
+        assert.are.equal("Validation failed", response.message)
+        assert.are.equal("REQUIRED", response.errors.command)
+      end
+    )
   end)
 
   describe("setup", function()
