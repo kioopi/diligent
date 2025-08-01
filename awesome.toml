@@ -1,0 +1,27 @@
+[selene]
+base = "lua53"
+name = "awesome"
+
+[awesome]
+any = true
+
+[awful]
+any = true
+
+[client]
+any = true
+
+[screen]
+any = true
+
+[tag]
+any = true
+
+[menubar]
+any = true
+
+[root]
+any = true
+
+[mouse]
+any = true

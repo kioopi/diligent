@@ -13,7 +13,7 @@ function spawn_test_handler.execute(payload)
   -- Mock PID for testing (in real implementation, this would be from awful.spawn)
   local mock_pid = math.random(1000, 9999)
 
-  return {
+  return true, {
     status = "success",
     command = payload.command,
     pid = mock_pid,

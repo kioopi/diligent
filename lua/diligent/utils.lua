@@ -60,8 +60,36 @@ function utils.format_success_response(data)
   return response
 end
 
+function utils.format_failure_response(data)
+  local response = {
+    status = "failure",
+    timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+  }
+
+  if type(data) == "string" then
+    response.message = data
+    return response
+  end
+
+  -- Merge data into response
+  for key, value in pairs(data) do
+    response[key] = value
+  end
+
+  return response
+end
+
 -- Send response back to CLI via signal
-function utils.send_response(data)
+function utils.emit_response(data)
+  json_response = utils.encode_response(data)
+
+  -- Emit signal for signal-based communication
+  if awesome and awesome.emit_signal then
+    awesome.emit_signal("diligent::response", json_response)
+  end
+end
+
+function utils.encode_response(data)
   local success, json_response = json_utils.encode(data)
   if not success then
     -- If encoding fails, send error response
@@ -71,14 +99,11 @@ function utils.send_response(data)
       timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
     })
     if not success then
-      return -- Cannot even encode error response
+      return "Error encoding response"
     end
   end
 
-  -- Emit signal for signal-based communication
-  if awesome and awesome.emit_signal then
-    awesome.emit_signal("diligent::response", json_response)
-  end
+  return json_response
 end
 
 return utils

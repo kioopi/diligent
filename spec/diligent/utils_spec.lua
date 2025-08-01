@@ -105,7 +105,7 @@ describe("Diligent Utils", function()
     end)
   end)
 
-  describe("send_response", function()
+  describe("emit_response", function()
     it("should call awesome.emit_signal when awesome is available", function()
       local original_awesome = _G.awesome
       local signal_data = nil
@@ -119,7 +119,7 @@ describe("Diligent Utils", function()
       }
 
       local test_data = { status = "success", message = "test" }
-      utils.send_response(test_data)
+      utils.emit_response(test_data)
 
       assert.are.equal("diligent::response", signal_name)
       assert.is_string(signal_data)
@@ -146,7 +146,7 @@ describe("Diligent Utils", function()
       local circular_table = {}
       circular_table.self = circular_table
 
-      utils.send_response(circular_table)
+      utils.emit_response(circular_table)
 
       assert.are.equal(1, #signal_calls)
       assert.are.equal("diligent::response", signal_calls[1].name)

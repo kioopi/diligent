@@ -35,7 +35,7 @@ describe("Ping Handler", function()
         timestamp = "2025-07-29T10:00:00Z",
       }
 
-      local response = ping_handler.execute(payload)
+      local _, response = ping_handler.execute(payload)
 
       assert.are.equal("success", response.status)
       assert.are.equal("pong", response.message)
@@ -48,7 +48,7 @@ describe("Ping Handler", function()
         timestamp = "2025-07-29T10:00:00Z",
       }
 
-      local response = ping_handler.execute(payload)
+      local _, response = ping_handler.execute(payload)
 
       assert.matches("%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%dZ", response.timestamp)
     end)

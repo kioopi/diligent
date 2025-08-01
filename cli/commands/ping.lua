@@ -38,7 +38,8 @@ local payload = {
   source = "diligent-cli",
 }
 
-local success, response = dbus.send_ping(payload)
+-- local success, response = dbus.send_ping(payload)
+local success, response = dbus.dispatch_command("ping", payload)
 
 if not success then
   p.error("Failed to get response: " .. response)
@@ -51,11 +52,13 @@ if not success then
   os.exit(1)
 end
 
-p.success("Ping successful!")
-p.info("Response: " .. response)
-
--- Check if response is valid JSON
-local parse_success, error = dbus.parse_response(response)
-if not parse_success then
-  p.error("Could not JSON parse response " .. tostring(error))
+if response and response.status ~= "success" then
+  require("pl.pretty").dump(result)
+  p.error("Ping failed: " .. (response.message or "Unknown error"))
+  p.error("Timestamp: " .. type(result) .. tostring(result))
+  os.exit(1)
 end
+
+p.success("Ping successful!")
+p.info(string.format("Message: %s", response.message))
+p.info(string.format("Timestamp: %s", response.timestamp))

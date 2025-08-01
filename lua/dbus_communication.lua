@@ -27,8 +27,8 @@ function dbus_comm.execute_in_awesome(lua_code, timeout_ms)
   return dbus_core.execute_lua_code(lua_code, timeout_ms)
 end
 
--- Send a command to AwesomeWM via D-Bus (compatible with cli_communication.lua interface)
-function dbus_comm.send_command(command, payload)
+-- Send a command to AwesomeWM via D-Bus
+function dbus_comm.emit_command(command, payload)
   local json_utils = require("json_utils")
 
   -- Encode payload as JSON
@@ -47,38 +47,51 @@ function dbus_comm.send_command(command, payload)
   return dbus_core.execute_lua_code(lua_code)
 end
 
+-- Send a command to AwesomeWM via D-Bus
+function dbus_comm.dispatch_command(command, payload)
+  local json_utils = require("json_utils")
+
+  -- Encode payload as JSON
+  local status, json_payload = json_utils.encode(payload)
+  if not status then
+    return json_payload
+  end
+
+  -- Create Lua code to emit signal
+  local lua_code = string.format(
+    'return require("diligent").dispatch_json("diligent::%s", %s)',
+    command,
+    string.format("%q", json_payload)
+  )
+
+  local success, json = dbus_core.execute_lua_code(lua_code)
+
+  if not success then
+    return false, {
+      status = "error",
+      message = "Failed to execute command in AwesomeWM",
+      timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+    }
+  end
+
+  local parsed, result_or_error = json_utils.decode(json)
+
+  if not parsed then
+    return false, {
+      status = "error",
+      message = "Failed to parse response: " .. tostring(result_or_error),
+      timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+    }
+  end
+
+  return true, result_or_error
+end
+
 -- Check if AwesomeWM is available via D-Bus
 function dbus_comm.check_awesome_available()
   local success, result = dbus_core.execute_lua_code('return "available"', 1000)
   local is_available = success and result == "available"
   return is_available
-end
-
--- Send ping command and wait for response from AwesomeWM
-function dbus_comm.send_ping(payload)
-  -- execute_fn parameter is ignored (for compatibility)
-  -- timeout_seconds is ignored (D-Bus has its own timeout)
-
-  -- Create Lua code that handles ping directly and returns JSON response
-  local lua_code = string.format(
-    [[
-    local dkjson = require('dkjson')
-
-    -- Create ping response directly (matching diligent.lua format)
-    local response = {
-      status = "success",
-      message = "pong",
-      timestamp = os.date("!%%Y-%%m-%%dT%%H:%%M:%%SZ"),
-      received_timestamp = %q
-    }
-
-    return dkjson.encode(response)
-  ]],
-    payload.timestamp or ""
-  )
-
-  -- Execute via D-Bus and get immediate response
-  return dbus_core.execute_lua_code(lua_code)
 end
 
 -- Parse JSON response from AwesomeWM (same as cli_communication.lua)

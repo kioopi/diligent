@@ -34,7 +34,7 @@ Create `spec/awesome_module_spec.lua`:
 ```lua
 local cli_comm = {}
 
-function cli_comm.send_command(command, payload)
+function cli_comm.emit_command(command, payload)
   -- Send JSON via awesome-client
   -- Return success/failure and response
 end

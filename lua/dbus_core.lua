@@ -6,7 +6,7 @@ with AwesomeWM via the org.awesomewm.awful.Remote interface.
 
 Responsibilities:
 - Initialize LGI (Lua GObject Introspection) components
-- Manage D-Bus session bus connections (with caching)  
+- Manage D-Bus session bus connections (with caching)
 - Parse D-Bus variant responses into Lua values
 - Execute Lua code remotely in AwesomeWM via D-Bus calls
 - Handle D-Bus communication errors gracefully
@@ -81,7 +81,7 @@ end
 -- Parse D-Bus variant response into a string representation
 function dbus_core.parse_variant_value(result_value)
   if not result_value then
-    return "unknown_type"
+    return "no return value"
   end
 
   -- Try each type in order, returning the first successful parse

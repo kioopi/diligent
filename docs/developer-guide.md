@@ -215,7 +215,7 @@ Diligent uses D-Bus for fast, reliable communication between the CLI and Awesome
 ### Communication Layers
 
 1. **Direct D-Bus Execution** (`execute_in_awesome()`) - For immediate Lua execution
-2. **Signal-Based Commands** (`send_command()`) - For structured application commands
+2. **Signal-Based Commands** (`emit_command()`) - For structured application commands
 
 ### Testing D-Bus Communication
 
@@ -237,27 +237,21 @@ print('Success:', success, 'Result:', result)
 "
 ```
 
-#### Send Structured Commands
+#### Send async commands 
 ```bash
 lua -e "
 local dbus_comm = require('dbus_communication')
-local success, result = dbus_comm.send_command('ping', {timestamp = '2025-01-01T00:00:00Z'})
+local success, result = dbus_comm.emit_command('ping', {timestamp = '2025-01-01T00:00:00Z'})
 print('Success:', success, 'Result:', result)
 "
 ```
 
-#### Test Ping Communication
+#### Send sync commands that return results
 ```bash
 lua -e "
 local dbus_comm = require('dbus_communication')
-local success, response = dbus_comm.send_ping({timestamp = '2025-01-01T00:00:00Z'})
-print('Success:', success)
-if success then
-  local parse_success, data = dbus_comm.parse_response(response)
-  if parse_success then
-    print('Status:', data.status, 'Message:', data.message)
-  end
-end
+local success, result = dbus_comm.dispatch_command('ping', {timestamp = '2025-01-01T00:00:00Z'})
+print('Success:', success, 'Result:', result)
 "
 ```
 

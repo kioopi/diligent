@@ -173,16 +173,16 @@ describe("Integration: CLI to AwesomeWM Communication", function()
         [[
         local received_signal = false
         local received_data = nil
-        
+
         -- Set up a test signal handler
         awesome.connect_signal('diligent::test_signal', function(data)
           received_signal = true
           received_data = data
         end)
-        
+
         -- Emit the test signal
         awesome.emit_signal('diligent::test_signal', 'test_payload')
-        
+
         -- Write results to file
         local f = io.open('%s', 'w')
         f:write('Signal received: ' .. tostring(received_signal) .. ', Data: ' .. tostring(received_data))
@@ -232,7 +232,7 @@ describe("Integration: CLI to AwesomeWM Communication", function()
 
       -- Now send a signal from CLI
       local signal_success, _ =
-        dbus.send_command("cli_test", { test_data = "hello_from_cli" })
+        dbus.emit_command("cli_test", { test_data = "hello_from_cli" })
       assert.is_true(signal_success, "Should be able to send signal from CLI")
 
       -- Wait a moment for signal processing
@@ -241,8 +241,9 @@ describe("Integration: CLI to AwesomeWM Communication", function()
       -- Check if the signal was received
       local file = io.open(test_file, "r")
       assert.is_not_nil(file, "Signal handler should create test file")
-      local test_result = file:read("*a")
-      file:close()
+      local test_result = file and file:read("*a")
+      assert.is_not_nil(test_result, "Test file should contain data")
+      assert.is_not_nil(file and file:close(), "Should close test file properly")
       os.remove(test_file)
 
       assert.matches(
@@ -265,7 +266,7 @@ describe("Integration: CLI to AwesomeWM Communication", function()
         source = "diligent-cli",
       }
 
-      local success, response = dbus.send_ping(payload, nil, 5)
+      local success, response = dbus.dispatch_command("ping", payload)
 
       if not success then
         error(
@@ -279,16 +280,12 @@ describe("Integration: CLI to AwesomeWM Communication", function()
       assert.is_true(success, "Expected ping to succeed")
       assert.is_not_nil(response, "Expected response from AwesomeWM")
 
-      -- Parse the JSON response
-      local response_success, data = dbus.parse_response(response)
-      assert.is_true(
-        response_success,
-        "Expected valid JSON response: " .. (response or "empty")
-      )
-      assert.are.equal("success", data.status)
-      assert.are.equal("pong", data.message)
-      assert.is_string(data.timestamp)
-      assert.are.equal("2025-07-29T10:00:00Z", data.received_timestamp)
+      if response then
+        assert.are.equal("success", response.status)
+        assert.are.equal("pong", response.message)
+        assert.is_string(response.timestamp)
+        assert.are.equal("2025-07-29T10:00:00Z", response.received_timestamp)
+      end
     end)
   end)
 end)

@@ -1,7 +1,7 @@
 local assert = require("luassert")
 
 describe("Ping Command Script", function()
-  local ping_script_path = "lua/commands/ping.lua"
+  local ping_script_path = "cli/commands/ping.lua"
 
   describe("script execution", function()
     it(
@@ -39,9 +39,8 @@ describe("Ping Command Script", function()
     it("should handle missing dependencies gracefully", function()
       -- Test that script fails gracefully if dependencies are missing
       local test_code = [[
-        package.path = "./lua/?.lua;" .. package.path
         local success, result = pcall(function()
-          require("commands.ping")
+          require("commands.bumm")
         end)
         if not success then
           print("dependency_error")
@@ -53,11 +52,7 @@ describe("Ping Command Script", function()
       handle:close()
 
       -- Should either load successfully or show dependency error
-      assert.is_true(
-        string.match(output, "dependency_error")
-          or not string.match(output, "error"),
-        "Should handle dependencies appropriately"
-      )
+      assert.matches("dependency_error", output, "Should inform about missing dependencies")
     end)
   end)
 

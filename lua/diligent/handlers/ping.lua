@@ -10,7 +10,7 @@ ping_handler.validator = livr.new({
 
 -- Execute ping command
 function ping_handler.execute(payload)
-  return {
+  return true, {
     status = "success",
     message = "pong",
     timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),

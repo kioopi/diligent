@@ -194,7 +194,7 @@ local function create_service(deps)
   local awesome_client = deps.awesome_client or require("awesome_client")
   
   return {
-    send_command = function(cmd)
+    emit_command = function(cmd)
       return awesome_client.send(cmd)
     end
   }

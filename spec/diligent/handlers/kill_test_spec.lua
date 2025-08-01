@@ -68,7 +68,7 @@ describe("Kill Test Handler", function()
         pid = 1234,
       }
 
-      local response = kill_test_handler.execute(payload)
+      local _, response = kill_test_handler.execute(payload)
 
       assert.are.equal("success", response.status)
       assert.are.equal(1234, response.pid)
@@ -81,7 +81,7 @@ describe("Kill Test Handler", function()
 
       for _, pid in ipairs(test_pids) do
         local payload = { pid = pid }
-        local response = kill_test_handler.execute(payload)
+        local _, response = kill_test_handler.execute(payload)
 
         assert.are.equal("success", response.status)
         assert.are.equal(pid, response.pid)

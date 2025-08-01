@@ -2,7 +2,7 @@ rockspec_format = "3.0"
 package = "diligent"
 version = "scm-0"
 source = {
-   url = "git+https://github.com/user/diligent.git"
+   url = "git+https://github.com/kioopi/diligent.git"
 }
 description = {
    summary = "A declarative, per-project workspace manager for AwesomeWM",
@@ -14,8 +14,8 @@ dependencies = {
    "dkjson >= 2.5",
    "luaposix >= 35.0",
    "lua_cliargs >= 3.0",
-   "penlight >= 1.5.0"
-   "lua-livr >= 2.0",
+   "penlight >= 1.5.0",
+   "lua-livr >= 0.5",
 }
 build = {
    type = "builtin",

@@ -57,7 +57,7 @@ describe("Spawn Test Handler", function()
         command = "echo 'test command'",
       }
 
-      local response = spawn_test_handler.execute(payload)
+      local _, response = spawn_test_handler.execute(payload)
 
       assert.are.equal("success", response.status)
       assert.are.equal("echo 'test command'", response.command)
@@ -72,8 +72,8 @@ describe("Spawn Test Handler", function()
         command = "test command",
       }
 
-      local response1 = spawn_test_handler.execute(payload)
-      local response2 = spawn_test_handler.execute(payload)
+      local _, response1 = spawn_test_handler.execute(payload)
+      local _, response2 = spawn_test_handler.execute(payload)
 
       assert.is_number(response1.pid)
       assert.is_number(response2.pid)

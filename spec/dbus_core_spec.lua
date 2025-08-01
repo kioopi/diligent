@@ -174,7 +174,7 @@ describe("dbus_core", function()
 
     it("should handle nil variant gracefully", function()
       local result = dbus_core.parse_variant_value(nil)
-      assert.are.equal("unknown_type", result)
+      assert.are.equal("no return value", result)
     end)
   end)
 

@@ -13,7 +13,7 @@ function kill_test_handler.execute(payload)
   -- Mock kill operation (in real implementation, this would use posix.kill)
   local mock_killed = payload.pid > 0 -- Simple mock logic
 
-  return {
+  return true, {
     status = "success",
     pid = payload.pid,
     killed = mock_killed,

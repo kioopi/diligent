@@ -6,13 +6,17 @@ A declarative, per-project workspace manager for AwesomeWM.
 
 ## Project Status
 
-**Phase 0 Complete**: Project scaffolding, CI/CD, and D-Bus communication layer implemented.
+**Phase 0 Complete**: Project scaffolding, CI/CD, and D-Bus communication layer implemented.  
+**Phase 1 Architecture**: Major modular refactoring completed with production-ready foundation.
 
 **Current Features:**
 - ✅ Fast D-Bus communication between CLI and AwesomeWM (~12-16ms response time)
 - ✅ Working `workon ping` command for testing connectivity  
+- ✅ **Modular Architecture**: Clean handler system with lua-LIVR validation
+- ✅ **Dual Communication Layer**: Async signals (`emit_command`) and sync dispatch (`dispatch_command`)
+- ✅ **Robust Error Handling**: Structured validation and error responses
+- ✅ **Handler Registration System**: Extensible architecture for new commands
 - ✅ Comprehensive test suite with >60% coverage
-- ✅ Clean two-layer communication architecture
 
 ## Installation
 
@@ -114,12 +118,20 @@ chmod +x cli/workon
 
 ### Architecture Overview
 
-Diligent uses a **dual-layer D-Bus communication system**:
+Diligent features a **production-ready modular architecture**:
 
-1. **Direct D-Bus Execution** - For immediate responses and debugging
-2. **Signal-Based Commands** - For structured application commands
+**Communication Layer:**
+1. **Direct D-Bus Execution** (`dispatch_command`) - For synchronous commands with return values
+2. **Signal-Based Commands** (`emit_command`) - For asynchronous operations
+3. **Handler Registration System** - Extensible, testable command processing
 
-**Performance**: ~12-16ms ping response time via pure D-Bus communication.
+**Core Components:**
+- **Modular Handlers** - Separate modules for each command (ping, spawn_test, kill_test)
+- **lua-LIVR Validation** - Robust input validation with detailed error messages
+- **Centralized Utils** - Payload parsing, validation, and response formatting
+- **Comprehensive Testing** - Mockable architecture with extensive test coverage
+
+**Performance**: ~12-16ms ping response time via optimized D-Bus communication.
 
 ## Planning Documents
 - [Purpose & Vision](planning/01-Purpose.md)
@@ -145,12 +157,6 @@ make test lint fmt
 
 For detailed setup instructions, testing, and contribution guidelines, see the [Developer Guide](docs/developer-guide.md).
 
-## Phase 0 Exit Criteria ✅ Complete
-- [x] `git clone && luarocks make` succeeds
-- [x] `make test lint fmt` all pass locally  
-- [x] CI passes with ≥60% coverage on Lua 5.4
-- [x] Modern rockspec with proper dependencies
-- [x] Comprehensive toolchain setup
-- [x] D-Bus communication layer implemented and tested
-- [x] Working CLI with `workon ping` command
-- [x] Clean dual-layer communication architecture
+## Development Progress
+
+For detailed milestones, current status, and upcoming features, see the [Development Roadmap](planning/05-roadmap.md).

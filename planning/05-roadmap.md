@@ -35,10 +35,16 @@ A user can write a **single‑resource DSL file**, run `workon start sample`, an
 
 ### Steps
 
-1. **Signal plumbing** ✅ **COMPLETED**
+1. **Signal plumbing & Modular Architecture** ✅ **COMPLETED**
 
    * ✅ Implement CLI `ping` command with D-Bus communication (enhanced beyond original awesome-client approach)
    * ✅ Inside `diligent.lua`, register `diligent::ping` handler with JSON response
+   * ✅ **Major Refactoring**: Modular architecture with lua-LIVR validation
+     - Extracted utils.lua for payload parsing, validation, and response formatting
+     - Created separate handler modules (ping, spawn_test, kill_test)
+     - Implemented centralized handler registration system
+     - Added robust input validation with detailed error messages
+     - Enhanced API with async (`emit_command`) and sync (`dispatch_command`) operations
    * 🚧 Need to implement `start` command and `diligent::start` handler
 
 2. **Tag mapper (basic)** ⏳ **PENDING**
@@ -60,7 +66,12 @@ A user can write a **single‑resource DSL file**, run `workon start sample`, an
 
 *Exit criteria* — Manual test passes; user feedback accepted.
 
-**Current Status**: Basic D-Bus communication established with `ping`/`pong` functionality. CLI tool and AwesomeWM module can communicate bidirectionally.
+**Current Status**: 
+- ✅ Robust D-Bus communication with dual-layer architecture (direct execution + signal-based commands)
+- ✅ Modular, testable architecture with lua-LIVR validation
+- ✅ Handler registration system supporting both async and sync operations
+- ✅ Comprehensive test coverage with structured error handling
+- 🚧 Ready for DSL parsing and app spawning implementation
 
 ---
 
@@ -231,8 +242,14 @@ Phase 6                 ⏳
 ### Development Status Summary
 
 - ✅ **Phase 0**: Complete project scaffold, CI/CD, code quality tools
-- 🚧 **Phase 1**: D-Bus communication working, need DSL parsing and app spawning
+- 🚧 **Phase 1**: 
+  - ✅ D-Bus communication layer with dual architecture
+  - ✅ Modular handler system with lua-LIVR validation  
+  - ✅ Handler registration and response formatting
+  - 🚧 DSL parsing and app spawning (next priority)
 - ⏳ **Phase 2+**: Awaiting Phase 1 completion
+
+**Recent Achievement**: Major architectural refactoring completed with modular design, robust validation, and comprehensive test coverage.
 
 **Next Priority**: Implement `start` command with basic DSL parsing and app spawning.
 

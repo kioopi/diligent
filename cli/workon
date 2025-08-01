@@ -30,7 +30,7 @@ end)
 
 -- Define ping command
 
-cli:command("ping", "Test communication with AwesomeWM"):file("lua/commands/ping.lua")
+cli:command("ping", "Test communication with AwesomeWM"):file("cli/commands/ping.lua")
 
 -- Parse and execute
 local args, err = cli:parse(arg)

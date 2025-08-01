@@ -1,7 +1,26 @@
 local assert = require("luassert")
 local diligent = require("diligent")
+local livr = require("LIVR")
+local pretty = require("pl.pretty")
+
+local mock_handler = {
+  validator = livr.new({
+    command = { "required", "string" },
+  }),
+  execute = function(payload)
+    return true, {
+      status = "success",
+      message = "Command executed",
+      command = payload.command,
+    }
+  end,
+}
 
 describe("Diligent Refactored Module", function()
+  after_each(function()
+    diligent.handlers = {}
+  end)
+
   describe("module structure", function()
     it("should load the main module", function()
       assert.is_table(diligent)
@@ -26,26 +45,6 @@ describe("Diligent Refactored Module", function()
         end,
       }
 
-      -- Mock handler with validator
-      local mock_handler = {
-        validator = {
-          validate = function(self, payload)
-            if payload.command then
-              return payload, nil
-            else
-              return nil, { command = "REQUIRED" }
-            end
-          end,
-        },
-        execute = function(payload)
-          return {
-            status = "success",
-            message = "mock response",
-            command = payload.command,
-          }
-        end,
-      }
-
       diligent.connect_signal("test::command", mock_handler)
 
       assert.is_function(connected_signals["test::command"])
@@ -64,22 +63,6 @@ describe("Diligent Refactored Module", function()
         end,
         emit_signal = function(signal_name, data)
           emitted_responses[signal_name] = data
-        end,
-      }
-
-      -- Mock handler with validator that requires 'command'
-      local mock_handler = {
-        validator = {
-          validate = function(self, payload)
-            if payload.command then
-              return payload, nil
-            else
-              return nil, { command = "REQUIRED" }
-            end
-          end,
-        },
-        execute = function(payload)
-          return { status = "success", command = payload.command }
         end,
       }
 
@@ -118,25 +101,6 @@ describe("Diligent Refactored Module", function()
         end,
       }
 
-      local mock_handler = {
-        validator = {
-          validate = function(self, payload)
-            if payload.command then
-              return payload, nil
-            else
-              return nil, { command = "REQUIRED" }
-            end
-          end,
-        },
-        execute = function(payload)
-          return {
-            status = "success",
-            message = "Command executed",
-            command = payload.command,
-          }
-        end,
-      }
-
       diligent.connect_signal("test::command", mock_handler)
 
       -- Test with valid payload
@@ -156,6 +120,56 @@ describe("Diligent Refactored Module", function()
 
       _G.test_handler = nil
       _G.awesome = original_awesome
+    end)
+  end)
+
+  describe("register_handler", function()
+    it("should register a handler and connect signal", function()
+      local original_awesome = _G.awesome
+      local connected_signals = {}
+
+      _G.awesome = {
+        connect_signal = function(signal_name, handler_func)
+          connected_signals[signal_name] = handler_func
+        end,
+      }
+
+      diligent.register_handler("test::register", mock_handler)
+
+      assert.is_function(connected_signals["test::register"])
+      assert.is_table(diligent.handlers["test::register"])
+
+      _G.awesome = original_awesome
+    end)
+  end)
+
+  describe("dispatch", function()
+    it("should dispatch the command and return success response", function()
+      diligent.register_handler('test::command', mock_handler)
+      local payload = { command = "echo test" }
+      local response = diligent.dispatch("test::command", payload)
+
+      assert.are.equal("success", response.status)
+      assert.are.equal("Command executed", response.message)
+      assert.are.equal("echo test", response.command)
+    end)
+
+    it("should err for missing handler", function()
+      local payload = { command = "echo test" }
+      local response = diligent.dispatch("test::command", payload)
+
+      assert.are.equal("error", response.status)
+      assert.are.equal("No handler registered for: test::command", response.message)
+    end)
+
+    it("should dispatch and return error response for an invalid payload", function()
+      diligent.register_handler('test::command', mock_handler)
+      local payload = { no_comand = "echo test" }
+      local response = diligent.dispatch("test::command", payload)
+
+      assert.are.equal("error", response.status)
+      assert.are.equal("Validation failed", response.message)
+      assert.are.equal("REQUIRED", response.errors.command)
     end)
   end)
 
