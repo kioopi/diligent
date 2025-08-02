@@ -50,7 +50,8 @@
       "timer",
       "drawable",
       "drawin",
-      "selection"
+      "selection",
+      "app"
     ],
     "disable": ["lowercase-global"],
     "severity": {
