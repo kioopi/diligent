@@ -24,7 +24,7 @@ describe("CLI Error Reporter", function()
 
     -- Inject mock into package cache
     package.loaded.cli_printer = mock_cli_printer
-    
+
     -- Clear error_reporter from cache to ensure it uses our mock
     package.loaded["cli.error_reporter"] = nil
     error_reporter = require("cli.error_reporter")
