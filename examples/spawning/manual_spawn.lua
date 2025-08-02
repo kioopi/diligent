@@ -27,89 +27,114 @@ Options:
 package.path = package.path .. ";lua/?.lua"
 
 local dbus_comm = require("dbus_communication")
+local cliargs = require("cliargs")
 
--- Parse command line arguments
-local function parse_args(args)
-  if #args < 1 then
-    return nil, "Usage: manual_spawn.lua <app> <tag_spec> [options]"
-  end
-  
-  -- Check for help first
-  for i = 1, #args do
-    if args[i] == "--help" then
-      return "help"
-    end
-  end
-  
-  if #args < 2 then
-    return nil, "Usage: manual_spawn.lua <app> <tag_spec> [options]"
-  end
-  
-  local config = {
-    app = args[1],
-    tag_spec = args[2],
-    floating = false,
-    placement = nil,
-    width = nil,
-    height = nil
-  }
-  
-  -- Parse options
-  for i = 3, #args do
-    local arg = args[i]
-    if arg == "--help" then
-      return "help"
-    elseif arg == "--floating" then
-      config.floating = true
-    elseif arg:match("^--placement=") then
-      config.placement = arg:match("^--placement=(.+)$")
-    elseif arg:match("^--width=") then
-      config.width = tonumber(arg:match("^--width=(.+)$"))
-    elseif arg:match("^--height=") then
-      config.height = tonumber(arg:match("^--height=(.+)$"))
+-- Configure CLI arguments
+cliargs:set_description("Manual spawn tool for interactive testing of client spawning with tag assignment")
+
+-- Required arguments
+cliargs:argument("APP", "Application command to spawn")
+cliargs:argument("TAG_SPEC", "Tag specification: 0 (current), +N/-N (relative), N (absolute), or \"name\" (named tag)")
+
+-- Optional flags and options
+cliargs:flag("--floating", "Make the window floating")
+cliargs:option("--placement=POS", "Window placement (top_left, top_right, bottom_left, bottom_right, center, etc.)")
+cliargs:option("--width=PIXELS", "Window width in pixels")
+cliargs:option("--height=PIXELS", "Window height in pixels")
+
+-- Tracking options
+cliargs:option("--env=KEY=VALUE", "Set environment variable (can be used multiple times)")
+cliargs:option("--property=KEY=VALUE", "Set client property after spawn (can be used multiple times)")
+
+-- Output control options
+cliargs:flag("--quiet", "Minimal output for piping")
+cliargs:flag("--pid-only", "Output only the PID")
+cliargs:flag("--json", "JSON formatted output")
+cliargs:flag("--no-wait", "Don't wait for client to appear (faster, no property setting)")
+
+-- Parse arguments
+local args, err = cliargs:parse()
+
+if not args then
+  print("Error: " .. err)
+  print()
+  print(cliargs:print_help())
+  os.exit(1)
+end
+
+-- Parse environment variables and properties (handle multiple values)
+local env_vars = {}
+local properties = {}
+
+-- Handle --env options (can be multiple)
+if args.env then
+  if type(args.env) == "string" then
+    -- Single --env option
+    local key, value = args.env:match("^([^=]+)=(.*)$")
+    if key and value then
+      env_vars[key] = value
     else
-      return nil, "Unknown option: " .. arg
+      print("✗ Invalid environment variable format: " .. args.env .. " (use KEY=VALUE)")
+      os.exit(1)
+    end
+  elseif type(args.env) == "table" then
+    -- Multiple --env options
+    for _, env_str in ipairs(args.env) do
+      local key, value = env_str:match("^([^=]+)=(.*)$")
+      if key and value then
+        env_vars[key] = value
+      else
+        print("✗ Invalid environment variable format: " .. env_str .. " (use KEY=VALUE)")
+        os.exit(1)
+      end
     end
   end
+end
+
+-- Handle --property options (can be multiple)
+if args.property then
+  if type(args.property) == "string" then
+    -- Single --property option
+    local key, value = args.property:match("^([^=]+)=(.*)$")
+    if key and value then
+      properties[key] = value
+    else
+      print("✗ Invalid property format: " .. args.property .. " (use KEY=VALUE)")
+      os.exit(1)
+    end
+  elseif type(args.property) == "table" then
+    -- Multiple --property options
+    for _, prop_str in ipairs(args.property) do
+      local key, value = prop_str:match("^([^=]+)=(.*)$")
+      if key and value then
+        properties[key] = value
+      else
+        print("✗ Invalid property format: " .. prop_str .. " (use KEY=VALUE)")
+        os.exit(1)
+      end
+    end
+  end
+end
+
+-- Convert parsed args to config format for compatibility
+local config = {
+  app = args.APP,
+  tag_spec = args.TAG_SPEC,
+  floating = args.floating or false,
+  placement = args.placement,
+  width = args.width and tonumber(args.width),
+  height = args.height and tonumber(args.height),
   
-  return config
-end
-
--- Show help
-local function show_help()
-  print([[
-Manual Spawn Tool for Interactive Testing
-
-Usage:
-  lua5.3 examples/spawning/manual_spawn.lua <app> <tag_spec> [options]
-
-Arguments:
-  app       Application command to spawn
-  tag_spec  Tag specification:
-            - 0       Current tag
-            - +N      Current tag + N (e.g., +2)
-            - -N      Current tag - N (e.g., -1)
-            - N       Absolute tag index (e.g., 3)
-            - "name"  Named tag (created if doesn't exist)
-
-Options:
-  --floating           Make the window floating
-  --placement=<pos>    Window placement: top_left, top_right, bottom_left, 
-                       bottom_right, center, centered, top, bottom, left, right
-  --width=<w>          Window width in pixels
-  --height=<h>         Window height in pixels
-  --help               Show this help
-
-Examples:
-  manual_spawn.lua firefox 0                    # Current tag
-  manual_spawn.lua gedit +2                     # Current tag + 2  
-  manual_spawn.lua xterm "editor"               # Named tag "editor"
-  manual_spawn.lua nemo 3 --floating            # Tag 3, floating
-  manual_spawn.lua xcalc 0 --floating --placement=top_left --width=300 --height=200
-
-This tool integrates with Diligent's tag mapper to test tag resolution behavior.
-]])
-end
+  -- New tracking features
+  env_vars = env_vars,
+  properties = properties,
+  
+  -- Output control
+  quiet = args.quiet or false,
+  pid_only = args["pid-only"] or false,
+  json = args.json or false,
+  no_wait = args["no-wait"] or false
+}
 
 -- Helper function to execute Lua code in AwesomeWM
 local function exec_in_awesome(code)
@@ -117,74 +142,37 @@ local function exec_in_awesome(code)
   return success, result
 end
 
--- Convert tag spec to tag resolution logic (simplified for exploration)
+-- Initialize client manager module in AwesomeWM
+local function init_client_manager()
+  local success, result = exec_in_awesome([[
+    -- Load the awesome_client_manager module
+    local success, acm = pcall(require, "awesome_client_manager")
+    
+    if not success then
+      return "ERROR: Failed to load awesome_client_manager module: " .. tostring(acm)
+    end
+    
+    -- Store reference globally for easy access
+    _G.diligent_client_manager = acm
+    
+    return "SUCCESS: Client manager module loaded"
+  ]])
+  
+  return success, result
+end
+
+-- Resolve tag spec using client manager module
 local function resolve_tag_spec(tag_spec)
-  local lua_code = [[
-    local awful = require("awful")
+  local lua_code = string.format([[
+    local acm = _G.diligent_client_manager
+    local tag, msg = acm.resolve_tag_spec("%s")
     
-    local screen = awful.screen.focused()
-    local tags = screen.tags
-    local current_tag = screen.selected_tag
-    local tag_spec = "]] .. tag_spec .. [["
-    
-    local target_tag = nil
-    local error_msg = nil
-    
-    -- Parse tag specification
-    if tag_spec == "0" then
-      -- Current tag
-      target_tag = current_tag
-    elseif tag_spec:match("^%+(%d+)$") then
-      -- Relative positive (current + N)
-      local offset = tonumber(tag_spec:match("^%+(%d+)$"))
-      local target_index = current_tag.index + offset
-      if target_index <= #tags then
-        target_tag = tags[target_index]
-      else
-        error_msg = "Target index " .. target_index .. " exceeds available tags (" .. #tags .. ")"
-      end
-    elseif tag_spec:match("^%-(%d+)$") then
-      -- Relative negative (current - N)
-      local offset = tonumber(tag_spec:match("^%-(%d+)$"))
-      local target_index = current_tag.index - offset
-      if target_index >= 1 then
-        target_tag = tags[target_index]
-      else
-        error_msg = "Target index " .. target_index .. " is less than 1"
-      end
-    elseif tag_spec:match("^(%d+)$") then
-      -- Absolute index
-      local target_index = tonumber(tag_spec)
-      if target_index >= 1 and target_index <= #tags then
-        target_tag = tags[target_index]
-      else
-        error_msg = "Tag index " .. target_index .. " not found (available: 1-" .. #tags .. ")"
-      end
+    if tag then
+      return "SUCCESS: " .. msg
     else
-      -- Named tag - search for existing or create new
-      for _, tag in ipairs(tags) do
-        if tag.name == tag_spec then
-          target_tag = tag
-          break
-        end
-      end
-      
-      if not target_tag then
-        -- Create new named tag
-        target_tag = awful.tag.add(tag_spec, {
-          screen = screen,
-          layout = awful.layout.layouts[1]  -- Use first available layout
-        })
-      end
+      return "ERROR: " .. msg
     end
-    
-    if target_tag then
-      return "SUCCESS: Resolved to tag '" .. tostring(target_tag.name or "unnamed") .. 
-             "' (index: " .. target_tag.index .. ", screen: " .. screen.index .. ")"
-    else
-      return "ERROR: " .. (error_msg or "Unknown error")
-    end
-  ]]
+  ]], tag_spec)
   
   return exec_in_awesome(lua_code)
 end
@@ -219,8 +207,135 @@ local function build_spawn_properties(config, resolved_tag)
   return properties
 end
 
--- Spawn the application
-local function spawn_application(config)
+-- Forward declarations
+local spawn_minimal, spawn_quiet, spawn_json, spawn_verbose
+
+-- PID-only spawn mode
+spawn_minimal = function(config)
+  local success, env_json = require("json_utils").encode(config.env_vars or {})
+  if not success then
+    print("ERROR: Failed to encode env_vars")
+    return false
+  end
+  
+  local spawn_code = string.format([[
+    local acm = _G.diligent_client_manager
+    local json_utils = require("json_utils")
+    local success, env_vars_data = json_utils.decode('%s')
+    
+    local pid, snid, msg = acm.spawn_with_properties("%s", "%s", {
+      env_vars = env_vars_data or {}
+    })
+    
+    if pid then
+      return tostring(pid)
+    else
+      return "ERROR: " .. msg
+    end
+  ]], env_json, config.app, config.tag_spec)
+  
+  local success, result = exec_in_awesome(spawn_code)
+  
+  if success and not result:match("^ERROR:") then
+    print(result)  -- Just print the PID
+    return true
+  else
+    return false
+  end
+end
+
+-- Quiet spawn mode
+spawn_quiet = function(config)
+  local success, env_json = require("json_utils").encode(config.env_vars or {})
+  if not success then
+    print("ERROR: Failed to encode env_vars")
+    return false
+  end
+  
+  local spawn_code = string.format([[
+    local acm = _G.diligent_client_manager
+    local json_utils = require("json_utils")
+    local success, env_vars_data = json_utils.decode('%s')
+    
+    local pid, snid, msg = acm.spawn_with_properties("%s", "%s", {
+      env_vars = env_vars_data or {}
+    })
+    
+    if pid then
+      return "SUCCESS: " .. pid
+    else
+      return "ERROR: " .. msg
+    end
+  ]], env_json, config.app, config.tag_spec)
+  
+  local success, result = exec_in_awesome(spawn_code)
+  
+  if success and result:match("^SUCCESS:") then
+    local pid = result:match("SUCCESS: (%d+)")
+    print("✓ Spawned " .. config.app .. " (PID: " .. pid .. ")")
+    return true
+  else
+    print("✗ Failed to spawn " .. config.app .. ": " .. (result:gsub("^ERROR: ", "") or "unknown error"))
+    return false
+  end
+end
+
+-- JSON spawn mode
+spawn_json = function(config)
+  local json_utils = require("json_utils")
+  local spawn_config = {
+    env_vars = config.env_vars or {},
+    floating = config.floating,
+    placement = config.placement,
+    width = config.width,
+    height = config.height
+  }
+  
+  local success, config_json = json_utils.encode(spawn_config)
+  if not success then
+    print("ERROR: Failed to encode spawn config")
+    return false
+  end
+  
+  local spawn_code = string.format([[
+    local acm = _G.diligent_client_manager
+    local json_utils = require("json_utils")
+    local success, spawn_config_data = json_utils.decode('%s')
+    
+    local pid, snid, msg = acm.spawn_with_properties("%s", "%s", spawn_config_data or {})
+    
+    if pid then
+      return json_utils.encode({
+        success = true,
+        pid = pid,
+        snid = snid,
+        app = "%s",
+        message = msg
+      })
+    else
+      return json_utils.encode({
+        success = false,
+        error = msg,
+        app = "%s"
+      })
+    end
+  ]], config_json, config.app, config.tag_spec, config.app, config.app)
+  
+  local success, result = exec_in_awesome(spawn_code)
+  
+  if success then
+    print(result)  -- Print JSON result
+    local parsed, data = json_utils.decode(result)
+    return parsed and data.success
+  else
+    local error_json = json_utils.encode({success = false, error = result})
+    print(error_json)
+    return false
+  end
+end
+
+-- Verbose spawn (default mode)
+spawn_verbose = function(config)
   print("=== Manual Spawn Tool ===")
   print()
   
@@ -281,99 +396,106 @@ local function spawn_application(config)
   if config.width or config.height then
     print(string.format("Dimensions: %sx%s", config.width or "auto", config.height or "auto"))
   end
+  
+  -- Show environment variables
+  if next(config.env_vars) then
+    print("Environment variables:")
+    for key, value in pairs(config.env_vars) do
+      print(string.format("  %s=%s", key, value))
+    end
+  end
+  
+  -- Show properties that will be set
+  if next(config.properties) then
+    print("Client properties to set:")
+    for key, value in pairs(config.properties) do
+      print(string.format("  %s=%s", key, value))
+    end
+  end
+  
   print()
   
   -- Step 4: Execute spawn
   print("4. Spawning Application")
   print("-----------------------")
   
-  local spawn_code = [[
-    local awful = require("awful")
-    local screen = awful.screen.focused()
-    local tags = screen.tags
-    local current_tag = screen.selected_tag
-    local tag_spec = "]] .. config.tag_spec .. [["
+  local json_utils = require("json_utils")
+  local spawn_config = {
+    env_vars = config.env_vars or {},
+    floating = config.floating,
+    placement = config.placement,
+    width = config.width,
+    height = config.height
+  }
+  
+  local success, config_json = json_utils.encode(spawn_config)
+  if not success then
+    print("✗ Failed to encode spawn config")
+    return false
+  end
+  
+  local spawn_code = string.format([[
+    local acm = _G.diligent_client_manager
+    local json_utils = require("json_utils")
+    local success, spawn_config_data = json_utils.decode('%s')
     
-    -- Re-resolve tag (simplified version)
-    local target_tag = nil
-    local error_msg = nil
+    local pid, snid, msg = acm.spawn_with_properties("%s", "%s", spawn_config_data or {})
     
-    if tag_spec == "0" then
-      target_tag = current_tag
-    elseif tag_spec:match("^%+(%d+)$") then
-      local offset = tonumber(tag_spec:match("^%+(%d+)$"))
-      local target_index = current_tag.index + offset
-      if target_index <= #tags then
-        target_tag = tags[target_index]
-      else
-        error_msg = "Target index " .. target_index .. " exceeds available tags (" .. #tags .. ")"
-      end
-    elseif tag_spec:match("^%-(%d+)$") then
-      local offset = tonumber(tag_spec:match("^%-(%d+)$"))
-      local target_index = current_tag.index - offset
-      if target_index >= 1 then
-        target_tag = tags[target_index]
-      else
-        error_msg = "Target index " .. target_index .. " is less than 1"
-      end
-    elseif tag_spec:match("^(%d+)$") then
-      local target_index = tonumber(tag_spec)
-      if target_index >= 1 and target_index <= #tags then
-        target_tag = tags[target_index]
-      else
-        error_msg = "Tag index " .. target_index .. " not found (available: 1-" .. #tags .. ")"
-      end
+    if pid then
+      return "SPAWN_SUCCESS: " .. msg .. ", PID=" .. pid .. ", SNID=" .. (snid or "nil")
     else
-      for _, tag in ipairs(tags) do
-        if tag.name == tag_spec then
-          target_tag = tag
-          break
-        end
-      end
-      if not target_tag then
-        target_tag = awful.tag.add(tag_spec, {
-          screen = screen,
-          layout = awful.layout.layouts[1]
-        })
-      end
+      return "SPAWN_ERROR: " .. msg
     end
-    
-    if not target_tag then
-      return "ERROR: Tag resolution failed: " .. (error_msg or "Unknown error")
-    end
-    
-    local tag = target_tag
-    
-    -- Build properties
-    local properties = {tag = tag}]] ..
-    (config.floating and "\n    properties.floating = true" or "") ..
-    (config.placement and "\n    properties.placement = awful.placement." .. config.placement or "") ..
-    (config.width and "\n    properties.width = " .. config.width or "") ..
-    (config.height and "\n    properties.height = " .. config.height or "") .. [[
-    
-    -- Spawn application
-    local pid, snid = awful.spawn("]] .. config.app .. [[", properties)
-    
-    -- Check result
-    if type(pid) == "string" then
-      return "SPAWN_ERROR: " .. pid
-    else
-      return "SPAWN_SUCCESS: PID=" .. pid .. ", SNID=" .. (snid or "nil") .. 
-             ", Tag=" .. (tag.name or "unnamed") .. "(" .. tag.index .. ")"
-    end
-  ]]
+  ]], config_json, config.app, config.tag_spec)
   
   success, result = exec_in_awesome(spawn_code)
   
   if success then
     if result:match("^SPAWN_SUCCESS:") then
       print("✓", result:gsub("^SPAWN_SUCCESS: ", ""))
+      
+      -- Extract PID for property setting
+      local spawn_pid = result:match("PID=(%d+)")
+      
+      -- Step 5: Set client properties if requested
+      if next(config.properties) and spawn_pid and not config.no_wait then
+        print()
+        print("5. Setting Client Properties")
+        print("----------------------------")
+        
+        -- Wait a moment for client to appear
+        os.execute("sleep 2")
+        
+        -- Set properties on the spawned client
+        for prop_key, prop_value in pairs(config.properties) do
+          local prop_code = string.format([[
+            local acm = _G.diligent_client_manager
+            local success, result = acm.set_client_property(%s, "%s", "%s")
+            
+            if success then
+              return "SUCCESS: " .. result
+            else
+              return "ERROR: " .. result
+            end
+          ]], spawn_pid, prop_key, prop_value)
+          
+          local prop_success, prop_result = exec_in_awesome(prop_code)
+          
+          if prop_success and prop_result:match("^SUCCESS:") then
+            print("✓", prop_result:gsub("^SUCCESS: ", ""))
+          else
+            print("✗", prop_result:gsub("^ERROR: ", ""))
+          end
+        end
+      end
+      
       print()
       print("🎉 Application spawned successfully!")
       
       -- Optional: Show updated tag info
       print()
-      print("5. Updated Context")
+      local step_number = next(config.properties) and not config.no_wait and "6" or "5"
+      print(step_number .. ". Updated Context")
       print("------------------")
       success, result = exec_in_awesome([[
         local awful = require("awful")
@@ -411,6 +533,24 @@ local function spawn_application(config)
   return true
 end
 
+-- Spawn application dispatcher
+local function spawn_application(config)
+  -- Handle different output modes
+  if config.pid_only then
+    -- PID-only mode: minimal execution, just return the PID
+    return spawn_minimal(config)
+  elseif config.json then
+    -- JSON mode: structured output
+    return spawn_json(config)
+  elseif config.quiet then
+    -- Quiet mode: minimal output for piping
+    return spawn_quiet(config)
+  else
+    -- Default verbose mode
+    return spawn_verbose(config)
+  end
+end
+
 -- Main execution
 local function main()
   -- Check if AwesomeWM is available
@@ -419,20 +559,14 @@ local function main()
     os.exit(1)
   end
   
-  -- Parse arguments
-  local config, error_msg = parse_args(arg)
-  
-  if config == "help" then
-    show_help()
-    os.exit(0)
-  elseif not config then
-    print("✗ " .. error_msg)
-    print()
-    show_help()
+  -- Initialize client manager module
+  local success, result = init_client_manager()
+  if not success or result:match("^ERROR:") then
+    print("✗ Failed to load client manager module:", result)
     os.exit(1)
   end
   
-  -- Execute spawn
+  -- Execute spawn (config is already set up from cliargs parsing)
   local success = spawn_application(config)
   os.exit(success and 0 or 1)
 end

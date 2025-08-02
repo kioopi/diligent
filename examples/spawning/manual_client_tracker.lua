@@ -68,213 +68,23 @@ if not dbus_comm.check_awesome_available() then
   os.exit(1)
 end
 
--- Setup tracking system in AwesomeWM
-print("Setting up client tracking system...")
+-- Setup client manager module in AwesomeWM
+print("Loading client manager module...")
 local success, result = exec_in_awesome([[
-  -- Initialize tracking system if not already present
-  if not _G.diligent_client_tracker then
-    _G.diligent_client_tracker = {}
+  -- Load the awesome_client_manager module
+  local success, acm = pcall(require, "awesome_client_manager")
+  
+  if not success then
+    return "ERROR: Failed to load awesome_client_manager module: " .. tostring(acm)
   end
   
-  local tracker = _G.diligent_client_tracker
+  -- Store reference globally for easy access
+  _G.diligent_client_manager = acm
   
-  -- Function to get comprehensive client information
-  function tracker.get_client_info(client)
-    return {
-      pid = client.pid,
-      name = client.name or "unnamed",
-      class = client.class or "unknown",
-      instance = client.instance or "unknown",
-      window_title = client.name or "untitled",
-      tag_index = client.first_tag and client.first_tag.index or 0,
-      tag_name = client.first_tag and client.first_tag.name or "no tag",
-      screen_index = client.screen and client.screen.index or 0,
-      floating = client.floating or false,
-      minimized = client.minimized or false,
-      maximized = client.maximized or false,
-      geometry = {
-        x = client.x or 0,
-        y = client.y or 0,
-        width = client.width or 0,
-        height = client.height or 0
-      }
-    }
-  end
+  -- Check module status
+  local status = acm.check_status()
   
-  -- Function to read environment variables from process
-  function tracker.read_process_env(pid)
-    local env_file = "/proc/" .. pid .. "/environ"
-    local file = io.open(env_file, "r")
-    
-    if not file then
-      return nil, "Cannot open " .. env_file .. " (process may not exist or no permission)"
-    end
-    
-    local content = file:read("*all")
-    file:close()
-    
-    if not content then
-      return nil, "Cannot read environ file"
-    end
-    
-    -- Parse environment variables (null-separated)
-    local env_vars = {}
-    local diligent_vars = {}
-    
-    for var in content:gmatch("([^%z]+)") do
-      local key, value = var:match("^([^=]+)=(.*)$")
-      if key then
-        env_vars[key] = value
-        if key:match("^DILIGENT_") then
-          diligent_vars[key] = value
-        end
-      end
-    end
-    
-    return {
-      all_vars = env_vars,
-      diligent_vars = diligent_vars,
-      total_count = (function() local count = 0; for _ in pairs(env_vars) do count = count + 1 end; return count end)()
-    }
-  end
-  
-  -- Function to get client properties
-  function tracker.get_client_properties(client)
-    local properties = {}
-    local diligent_properties = {}
-    
-    -- Common properties to check
-    local property_names = {
-      "diligent_project", "diligent_role", "diligent_resource_id",
-      "diligent_workspace", "diligent_start_time", "diligent_managed"
-    }
-    
-    for _, prop_name in ipairs(property_names) do
-      if client[prop_name] ~= nil then
-        properties[prop_name] = client[prop_name]
-        diligent_properties[prop_name] = client[prop_name]
-      end
-    end
-    
-    return {
-      all_properties = properties,
-      diligent_properties = diligent_properties
-    }
-  end
-  
-  -- Function to find client by PID
-  function tracker.find_by_pid(target_pid)
-    target_pid = tonumber(target_pid)
-    if not target_pid then
-      return nil, "Invalid PID format"
-    end
-    
-    for _, c in ipairs(client.get()) do
-      if c.pid == target_pid then
-        return c
-      end
-    end
-    
-    return nil, "No client found with PID " .. target_pid
-  end
-  
-  -- Function to find clients by environment variable
-  function tracker.find_by_env(env_key, env_value)
-    local matching_clients = {}
-    
-    for _, c in ipairs(client.get()) do
-      if c.pid then
-        local env_data, err = tracker.read_process_env(c.pid)
-        if env_data and env_data.all_vars[env_key] == env_value then
-          table.insert(matching_clients, c)
-        end
-      end
-    end
-    
-    return matching_clients
-  end
-  
-  -- Function to find clients by property
-  function tracker.find_by_property(prop_key, prop_value)
-    local matching_clients = {}
-    
-    for _, c in ipairs(client.get()) do
-      if c[prop_key] == prop_value then
-        table.insert(matching_clients, c)
-      end
-    end
-    
-    return matching_clients
-  end
-  
-  -- Function to find clients by name or class
-  function tracker.find_by_name_or_class(search_term)
-    local matching_clients = {}
-    local search_lower = search_term:lower()
-    
-    for _, c in ipairs(client.get()) do
-      local name = (c.name or ""):lower()
-      local class = (c.class or ""):lower()
-      
-      if name:find(search_lower) or class:find(search_lower) then
-        table.insert(matching_clients, c)
-      end
-    end
-    
-    return matching_clients
-  end
-  
-  -- Function to set client property
-  function tracker.set_client_property(pid, prop_key, prop_value)
-    local client_obj, err = tracker.find_by_pid(pid)
-    if not client_obj then
-      return false, err
-    end
-    
-    -- Convert string values to appropriate types
-    if prop_value == "true" then
-      prop_value = true
-    elseif prop_value == "false" then
-      prop_value = false
-    elseif tonumber(prop_value) then
-      prop_value = tonumber(prop_value)
-    end
-    
-    client_obj[prop_key] = prop_value
-    return true, "Property " .. prop_key .. " set to " .. tostring(prop_value)
-  end
-  
-  -- Function to get all clients with any tracking information
-  function tracker.get_all_tracked_clients()
-    local tracked_clients = {}
-    
-    for _, c in ipairs(client.get()) do
-      local has_tracking = false
-      
-      -- Check for environment variables
-      local env_data = nil
-      if c.pid then
-        env_data, _ = tracker.read_process_env(c.pid)
-        if env_data and next(env_data.diligent_vars) then
-          has_tracking = true
-        end
-      end
-      
-      -- Check for client properties
-      local prop_data = tracker.get_client_properties(c)
-      if next(prop_data.diligent_properties) then
-        has_tracking = true
-      end
-      
-      if has_tracking then
-        table.insert(tracked_clients, c)
-      end
-    end
-    
-    return tracked_clients
-  end
-  
-  return "✓ Client tracking system ready"
+  return "✓ Client manager module loaded (functions: " .. status.functions_count .. ")"
 ]])
 
 if not success then
@@ -382,23 +192,76 @@ local function main()
     print()
   end
   
-  -- Handle different modes
+  -- Handle property setting FIRST (before any lookups)
+  if args["set-property"] then
+    if not args.pid then
+      print("✗ --set-property requires --pid to specify target client")
+      os.exit(1)
+    end
+    
+    local key, value = args["set-property"]:match("^([^=]+)=(.*)$")
+    if not key or not value then
+      print("✗ Invalid property format. Use KEY=VALUE")
+      os.exit(1)
+    end
+    
+    print(string.format("Setting property %s=%s on PID %s...", key, value, args.pid))
+    
+    local set_code = string.format([[
+      local acm = _G.diligent_client_manager
+      local success, result = acm.set_client_property(%s, "%s", "%s")
+      
+      if success then
+        return "SUCCESS: " .. result
+      else
+        return "ERROR: " .. result
+      end
+    ]], args.pid, key, value)
+    
+    local success, result = exec_in_awesome(set_code)
+    
+    if success then
+      if result:match("^SUCCESS:") then
+        print("✓", result:gsub("^SUCCESS: ", ""))
+        print()
+      else
+        print("✗", result:gsub("^ERROR: ", ""))
+        os.exit(1)
+      end
+    else
+      print("✗ Property setting failed:", result)
+      os.exit(1)
+    end
+  end
+  
+  -- Handle environment variable setting FIRST (if implemented)
+  if args["set-env"] then
+    if not args.pid then
+      print("✗ --set-env requires --pid to specify target client")
+      os.exit(1)
+    end
+    
+    print("🚧 Environment variable setting not yet implemented")
+    print()
+  end
+  
+  -- Now handle lookup modes (will show updated information)
   if args.pid then
     -- Find by PID
     print("Looking up client by PID:", args.pid)
     print()
     
     local lookup_code = string.format([[
-      local tracker = _G.diligent_client_tracker
-      local client_obj, err = tracker.find_by_pid(%s)
+      local acm = _G.diligent_client_manager
+      local client_obj, err = acm.find_by_pid(%s)
       
       if not client_obj then
         return "ERROR: " .. err
       end
       
-      local client_info = tracker.get_client_info(client_obj)
-      local env_data, env_err = tracker.read_process_env(client_obj.pid)
-      local prop_data = tracker.get_client_properties(client_obj)
+      local client_info = acm.get_client_info(client_obj)
+      local env_data, env_err = acm.read_process_env(client_obj.pid)
+      local prop_data = acm.get_client_properties(client_obj)
       
       local result = {
         status = "success",
@@ -448,8 +311,8 @@ local function main()
     print()
     
     local lookup_code = string.format([[
-      local tracker = _G.diligent_client_tracker
-      local clients = tracker.find_by_env("%s", "%s")
+      local acm = _G.diligent_client_manager
+      local clients = acm.find_by_env("%s", "%s")
       
       if #clients == 0 then
         return "ERROR: No clients found with %s=%s"
@@ -457,9 +320,9 @@ local function main()
       
       local results = {}
       for _, client_obj in ipairs(clients) do
-        local client_info = tracker.get_client_info(client_obj)
-        local env_data, env_err = tracker.read_process_env(client_obj.pid)
-        local prop_data = tracker.get_client_properties(client_obj)
+        local client_info = acm.get_client_info(client_obj)
+        local env_data, env_err = acm.read_process_env(client_obj.pid)
+        local prop_data = acm.get_client_properties(client_obj)
         
         table.insert(results, {
           client = client_info,
@@ -515,8 +378,8 @@ local function main()
     print()
     
     local lookup_code = string.format([[
-      local tracker = _G.diligent_client_tracker
-      local clients = tracker.find_by_property("%s", "%s")
+      local acm = _G.diligent_client_manager
+      local clients = acm.find_by_property("%s", "%s")
       
       if #clients == 0 then
         return "ERROR: No clients found with property %s=%s"
@@ -524,9 +387,9 @@ local function main()
       
       local results = {}
       for _, client_obj in ipairs(clients) do
-        local client_info = tracker.get_client_info(client_obj)
-        local env_data, env_err = tracker.read_process_env(client_obj.pid)
-        local prop_data = tracker.get_client_properties(client_obj)
+        local client_info = acm.get_client_info(client_obj)
+        local env_data, env_err = acm.read_process_env(client_obj.pid)
+        local prop_data = acm.get_client_properties(client_obj)
         
         table.insert(results, {
           client = client_info,
@@ -576,8 +439,8 @@ local function main()
     print()
     
     local lookup_code = string.format([[
-      local tracker = _G.diligent_client_tracker
-      local clients = tracker.find_by_name_or_class("%s")
+      local acm = _G.diligent_client_manager
+      local clients = acm.find_by_name_or_class("%s")
       
       if #clients == 0 then
         return "ERROR: No clients found matching '%s'"
@@ -585,9 +448,9 @@ local function main()
       
       local results = {}
       for _, client_obj in ipairs(clients) do
-        local client_info = tracker.get_client_info(client_obj)
-        local env_data, env_err = tracker.read_process_env(client_obj.pid)
-        local prop_data = tracker.get_client_properties(client_obj)
+        local client_info = acm.get_client_info(client_obj)
+        local env_data, env_err = acm.read_process_env(client_obj.pid)
+        local prop_data = acm.get_client_properties(client_obj)
         
         table.insert(results, {
           client = client_info,
@@ -637,8 +500,8 @@ local function main()
     print()
     
     local success, result = exec_in_awesome([[
-      local tracker = _G.diligent_client_tracker
-      local clients = tracker.get_all_tracked_clients()
+      local acm = _G.diligent_client_manager
+      local clients = acm.get_all_tracked_clients()
       
       if #clients == 0 then
         return "ERROR: No tracked clients found"
@@ -646,9 +509,9 @@ local function main()
       
       local results = {}
       for _, client_obj in ipairs(clients) do
-        local client_info = tracker.get_client_info(client_obj)
-        local env_data, env_err = tracker.read_process_env(client_obj.pid)
-        local prop_data = tracker.get_client_properties(client_obj)
+        local client_info = acm.get_client_info(client_obj)
+        local env_data, env_err = acm.read_process_env(client_obj.pid)
+        local prop_data = acm.get_client_properties(client_obj)
         
         table.insert(results, {
           client = client_info,
@@ -706,45 +569,6 @@ local function main()
     os.exit(1)
   end
   
-  -- Handle property setting if requested
-  if args.set_property then
-    if not args.pid then
-      print("✗ --set-property requires --pid to specify target client")
-      os.exit(1)
-    end
-    
-    local key, value = args.set_property:match("^([^=]+)=(.*)$")
-    if not key or not value then
-      print("✗ Invalid property format. Use KEY=VALUE")
-      os.exit(1)
-    end
-    
-    print()
-    print(string.format("Setting property %s=%s on PID %s...", key, value, args.pid))
-    
-    local set_code = string.format([[
-      local tracker = _G.diligent_client_tracker
-      local success, result = tracker.set_client_property(%s, "%s", "%s")
-      
-      if success then
-        return "SUCCESS: " .. result
-      else
-        return "ERROR: " .. result
-      end
-    ]], args.pid, key, value)
-    
-    local success, result = exec_in_awesome(set_code)
-    
-    if success then
-      if result:match("^SUCCESS:") then
-        print("✓", result:gsub("^SUCCESS: ", ""))
-      else
-        print("✗", result:gsub("^ERROR: ", ""))
-      end
-    else
-      print("✗ Property setting failed:", result)
-    end
-  end
 end
 
 -- Run main function
