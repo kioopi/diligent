@@ -1,6 +1,6 @@
 local assert = require("luassert")
 
-describe("tag_mapper.interfaces.dry_run_interface", function()
+describe("awe.interfaces.dry_run_interface", function()
   local dry_run_interface
 
   before_each(function()

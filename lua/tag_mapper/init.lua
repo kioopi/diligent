@@ -10,7 +10,7 @@ local tag_mapper = {}
 
 -- Load new architecture modules
 local tag_mapper_core = require("tag_mapper.core")
-local awesome_interface = require("tag_mapper.interfaces.awesome_interface")
+local awesome_interface = require("awe.interfaces.awesome_interface")
 local integration = require("tag_mapper.integration")
 
 -- Get the current selected tag index

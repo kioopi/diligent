@@ -10,15 +10,15 @@ describe("tag_mapper.integration", function()
     -- Clean module cache
     package.loaded["tag_mapper.integration"] = nil
     package.loaded["tag_mapper.core"] = nil
-    package.loaded["tag_mapper.interfaces.awesome_interface"] = nil
-    package.loaded["tag_mapper.interfaces.dry_run_interface"] = nil
+    package.loaded["awe.interfaces.awesome_interface"] = nil
+    package.loaded["awe.interfaces.dry_run_interface"] = nil
 
     integration = require("tag_mapper.integration")
     tag_mapper_core = require("tag_mapper.core")
 
     -- Load both interfaces for testing
-    awesome_interface = require("tag_mapper.interfaces.awesome_interface")
-    dry_run_interface = require("tag_mapper.interfaces.dry_run_interface")
+    awesome_interface = require("awe.interfaces.awesome_interface")
+    dry_run_interface = require("awe.interfaces.dry_run_interface")
 
     -- Clear dry-run state
     dry_run_interface.clear_execution_log()

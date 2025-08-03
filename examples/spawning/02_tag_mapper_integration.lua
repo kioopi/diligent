@@ -34,7 +34,7 @@ local success, result = exec_in_awesome([[
   local modules_available = {}
   local modules_to_test = {
     "tag_mapper.core",
-    "tag_mapper.interfaces.awesome_interface", 
+    "awe.interfaces.awesome_interface", 
     "tag_mapper.integration"
   }
   
