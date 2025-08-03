@@ -31,7 +31,7 @@ local function time_execution(func)
   local start_time = os.clock()
   local success, result = func()
   local end_time = os.clock()
-  local duration = (end_time - start_time) * 1000  -- Convert to milliseconds
+  local duration = (end_time - start_time) * 1000 -- Convert to milliseconds
   return success, result, duration
 end
 
@@ -168,14 +168,15 @@ local error_patterns = {}
 local test_commands = {
   "nonexistent_app_12345",
   "ls --invalid-flag",
-  "/bin/false",  -- Exists but exits with error
+  "/bin/false", -- Exists but exits with error
   "",
   "app with spaces",
-  "cat /dev/urandom | head"  -- Complex pipe that might behave unexpectedly
+  "cat /dev/urandom | head", -- Complex pipe that might behave unexpectedly
 }
 
 for i, cmd in ipairs(test_commands) do
-  local success, result = exec_in_awesome(string.format([[
+  local success, result = exec_in_awesome(string.format(
+    [[
     local awful = require("awful")
     local pid, snid = awful.spawn("%s")
     
@@ -184,10 +185,12 @@ for i, cmd in ipairs(test_commands) do
     else
       return "SUCCESS: PID " .. tostring(pid)
     end
-  ]], cmd:gsub('"', '\\"')))
-  
+  ]],
+    cmd:gsub('"', '\\"')
+  ))
+
   if success then
-    table.insert(error_patterns, {command = cmd, result = result})
+    table.insert(error_patterns, { command = cmd, result = result })
     print(string.format("  Command %d: %s", i, result))
   else
     print(string.format("  Command %d failed: %s", i, result))
@@ -328,7 +331,7 @@ print("=== Experiment 4.1 Complete ===")
 print()
 print("Summary of Findings:")
 print("- Error detection patterns and timing")
-print("- Process cleanup behavior") 
+print("- Process cleanup behavior")
 print("- Error message content and structure")
 print("- Resource exhaustion handling")
 print("- Integration with awesome_client_manager")
@@ -348,6 +351,6 @@ print()
 
 print("Next Steps:")
 print("1. Analyze error detection speed (should be < 100ms)")
-print("2. Verify no zombie processes from failed spawns") 
+print("2. Verify no zombie processes from failed spawns")
 print("3. Document error message patterns for user feedback")
 print("4. Update client manager with improved error handling")

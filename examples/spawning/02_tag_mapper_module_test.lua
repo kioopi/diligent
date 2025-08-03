@@ -38,16 +38,16 @@ local success, result = exec_in_awesome([[
 if success then
   print(result)
   local tag_mapper_available = result:match("✓")
-  
+
   if tag_mapper_available then
     print()
     print("🎉 SUCCESS: tag_mapper is available in AwesomeWM!")
     print()
-    
+
     -- Test 2: Try to use tag_mapper functions
     print("Test 2: Test tag_mapper functionality")
     print("------------------------------------")
-    
+
     success, result = exec_in_awesome([[
       local tag_mapper = require("tag_mapper")
       
@@ -64,13 +64,12 @@ if success then
         return "✗ tag_mapper.resolve_tag() failed: " .. tostring(resolved_tag)
       end
     ]])
-    
+
     if success then
       print(result)
     else
       print("✗ Functionality test failed:", result)
     end
-    
   else
     print()
     print("❌ FAILED: tag_mapper is not available - need to add sub-modules")

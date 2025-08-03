@@ -22,7 +22,7 @@ print()
 
 -- Helper function to execute Lua code in AwesomeWM and capture results
 local function exec_in_awesome(code)
-  local success, result = dbus_comm.execute_in_awesome(code, 15000)  -- Longer timeout for this experiment
+  local success, result = dbus_comm.execute_in_awesome(code, 15000) -- Longer timeout for this experiment
   return success, result
 end
 
@@ -31,7 +31,7 @@ local function time_execution(func)
   local start_time = os.clock()
   local success, result = func()
   local end_time = os.clock()
-  local duration = (end_time - start_time) * 1000  -- Convert to milliseconds
+  local duration = (end_time - start_time) * 1000 -- Convert to milliseconds
   return success, result, duration
 end
 
@@ -57,14 +57,15 @@ print()
 -- Test 1: Fast-starting Applications
 print("Test 1: Fast-starting Applications")
 print("----------------------------------")
-local fast_apps = {"xterm", "xcalc", "xeyes"}
+local fast_apps = { "xterm", "xcalc", "xeyes" }
 local timing_results = {}
 
 for _, app in ipairs(fast_apps) do
   print(string.format("Testing %s...", app))
-  
+
   local success, result, duration = time_execution(function()
-    return exec_in_awesome(string.format([[
+    return exec_in_awesome(string.format(
+      [[
       local acm = _G.diligent_client_manager
       local start_time = os.clock()
       
@@ -95,9 +96,11 @@ for _, app in ipairs(fast_apps) do
       else
         return "TIMEOUT: Client never appeared after " .. timeout .. " seconds (PID: " .. tostring(pid) .. ")"
       end
-    ]], app))
+    ]],
+      app
+    ))
   end)
-  
+
   if success then
     print("  " .. result)
     if result:match("SUCCESS:") then
@@ -116,15 +119,16 @@ print()
 print("Test 2: Applications with Startup Complexity")
 print("--------------------------------------------")
 local complex_apps = {
-  {app = "gedit", desc = "Text editor (GTK)"},
-  {app = "nemo", desc = "File manager (complex GUI)"},
-  {app = "firefox", desc = "Browser (heavy application)"},  -- Will likely fail, but good to test
+  { app = "gedit", desc = "Text editor (GTK)" },
+  { app = "nemo", desc = "File manager (complex GUI)" },
+  { app = "firefox", desc = "Browser (heavy application)" }, -- Will likely fail, but good to test
 }
 
 for _, test_case in ipairs(complex_apps) do
   print(string.format("Testing %s (%s)...", test_case.app, test_case.desc))
-  
-  local success, result = exec_in_awesome(string.format([[
+
+  local success, result = exec_in_awesome(string.format(
+    [[
     local acm = _G.diligent_client_manager
     local start_time = os.clock()
     
@@ -157,14 +161,16 @@ for _, test_case in ipairs(complex_apps) do
     else
       return test_case.app .. " never appeared after " .. timeout .. " seconds (PID: " .. tostring(pid) .. ", checks: " .. check_count .. ")"
     end
-  ]], test_case.app))
-  
+  ]],
+    test_case.app
+  ))
+
   if success then
     print("  " .. result)
   else
     print("  ✗ Test failed:", result)
   end
-  
+
   -- Give a moment between tests to avoid overwhelming
   os.execute("sleep 1")
 end
@@ -173,12 +179,13 @@ print()
 -- Test 3: Timeout Configuration Testing
 print("Test 3: Timeout Configuration Testing")
 print("-------------------------------------")
-local timeout_values = {1, 3, 5, 10}
+local timeout_values = { 1, 3, 5, 10 }
 
 for _, timeout in ipairs(timeout_values) do
   print(string.format("Testing %d second timeout with xterm...", timeout))
-  
-  local success, result = exec_in_awesome(string.format([[
+
+  local success, result = exec_in_awesome(string.format(
+    [[
     local acm = _G.diligent_client_manager
     local start_time = os.clock()
     
@@ -209,8 +216,10 @@ for _, timeout in ipairs(timeout_values) do
     else
       return "TIMEOUT: No client after " .. timeout .. " seconds"
     end
-  ]], timeout))
-  
+  ]],
+    timeout
+  ))
+
   if success then
     print("  " .. result)
   else
@@ -364,7 +373,7 @@ if next(timing_results) then
   local count = 0
   local max_time = 0
   local min_time = math.huge
-  
+
   for app, time in pairs(timing_results) do
     print(string.format("  %s: %d ms", app, time))
     total_time = total_time + time
@@ -372,12 +381,17 @@ if next(timing_results) then
     max_time = math.max(max_time, time)
     min_time = math.min(min_time, time)
   end
-  
+
   local avg_time = total_time / count
   print(string.format("\nStatistics:"))
   print(string.format("  Average: %.0f ms", avg_time))
   print(string.format("  Range: %d - %d ms", min_time, max_time))
-  print(string.format("  Recommended timeout: %d seconds (avg + 2x buffer)", math.ceil((avg_time * 3) / 1000)))
+  print(
+    string.format(
+      "  Recommended timeout: %d seconds (avg + 2x buffer)",
+      math.ceil((avg_time * 3) / 1000)
+    )
+  )
 else
   print("  No timing data collected")
 end
@@ -398,7 +412,9 @@ print("1. Fast applications (xterm, xcalc) appear within 100-500ms")
 print("2. Complex applications may need 2-10 seconds")
 print("3. False timeouts can occur with delayed startup patterns")
 print("4. Concurrent spawns don't significantly impact individual timing")
-print("5. 200ms check intervals provide good balance of responsiveness vs efficiency")
+print(
+  "5. 200ms check intervals provide good balance of responsiveness vs efficiency"
+)
 print()
 
 print("Next Steps:")

@@ -163,22 +163,22 @@ local property_tests = {
     app = "xterm",
     properties = {
       diligent_project = "test-project",
-      diligent_role = "terminal"
+      diligent_role = "terminal",
     },
-    description = "Basic project and role assignment"
+    description = "Basic project and role assignment",
   },
   {
     name = "Complex metadata",
-    app = "xterm", 
+    app = "xterm",
     properties = {
       diligent_project = "complex-project",
       diligent_resource_id = "main-terminal",
       diligent_workspace = "/home/user/projects/complex",
       diligent_start_time = "2025-01-02T12:00:00Z",
-      diligent_managed = true
+      diligent_managed = true,
     },
-    description = "Rich metadata with multiple data types"
-  }
+    description = "Rich metadata with multiple data types",
+  },
 }
 
 -- Test each property scenario
@@ -186,16 +186,17 @@ for i, test in ipairs(property_tests) do
   print(string.format("Test %d: %s", i, test.name))
   print("Description: " .. test.description)
   print(string.rep("-", 50))
-  
+
   print("Properties to set:")
   for key, value in pairs(test.properties) do
     print("  " .. key .. " = " .. tostring(value))
   end
   print()
-  
+
   -- Step 1: Spawn application
   print("1. Spawning application...")
-  local spawn_code = string.format([[
+  local spawn_code = string.format(
+    [[
     local tracker = _G.diligent_property_tracker
     local properties = %s
     
@@ -206,48 +207,59 @@ for i, test in ipairs(property_tests) do
     else
       return "SPAWN_SUCCESS: PID=" .. pid .. ", SNID=" .. (snid or "nil")
     end
-  ]], string.format("{%s}", table.concat(
-    (function()
-      local pairs_str = {}
-      for k, v in pairs(test.properties) do
-        if type(v) == "string" then
-          table.insert(pairs_str, string.format('["%s"]="%s"', k, v))
-        else
-          table.insert(pairs_str, string.format('["%s"]=%s', k, tostring(v)))
-        end
-      end
-      return pairs_str
-    end)(), ", "
-  )), test.app)
-  
+  ]],
+    string.format(
+      "{%s}",
+      table.concat(
+        (function()
+          local pairs_str = {}
+          for k, v in pairs(test.properties) do
+            if type(v) == "string" then
+              table.insert(pairs_str, string.format('["%s"]="%s"', k, v))
+            else
+              table.insert(
+                pairs_str,
+                string.format('["%s"]=%s', k, tostring(v))
+              )
+            end
+          end
+          return pairs_str
+        end)(),
+        ", "
+      )
+    ),
+    test.app
+  )
+
   success, result = exec_in_awesome(spawn_code)
-  
+
   if not success then
     print("  ✗ Spawn failed:", result)
     goto continue
   end
-  
+
   if result:match("^SPAWN_ERROR:") then
     print("  ✗", result:gsub("^SPAWN_ERROR: ", ""))
     goto continue
   end
-  
+
   print("  ✓", result:gsub("^SPAWN_SUCCESS: ", ""))
-  
+
   -- Extract PID
   local spawn_pid = result:match("PID=(%d+)")
   if not spawn_pid then
     print("  ✗ Could not extract PID from spawn result")
     goto continue
   end
-  
+
   -- Step 2: Wait for client to appear
   print("2. Waiting for client to appear...")
   os.execute("sleep 2")
-  
+
   -- Step 3: Assign properties to client
   print("3. Assigning properties to client...")
-  local assign_code = string.format([[
+  local assign_code = string.format(
+    [[
     local tracker = _G.diligent_property_tracker
     local properties = %s
     
@@ -258,22 +270,32 @@ for i, test in ipairs(property_tests) do
     else
       return "ASSIGN_ERROR: " .. result
     end
-  ]], string.format("{%s}", table.concat(
-    (function()
-      local pairs_str = {}
-      for k, v in pairs(test.properties) do
-        if type(v) == "string" then
-          table.insert(pairs_str, string.format('["%s"]="%s"', k, v))
-        else
-          table.insert(pairs_str, string.format('["%s"]=%s', k, tostring(v)))
-        end
-      end
-      return pairs_str
-    end)(), ", "
-  )), spawn_pid)
-  
+  ]],
+    string.format(
+      "{%s}",
+      table.concat(
+        (function()
+          local pairs_str = {}
+          for k, v in pairs(test.properties) do
+            if type(v) == "string" then
+              table.insert(pairs_str, string.format('["%s"]="%s"', k, v))
+            else
+              table.insert(
+                pairs_str,
+                string.format('["%s"]=%s', k, tostring(v))
+              )
+            end
+          end
+          return pairs_str
+        end)(),
+        ", "
+      )
+    ),
+    spawn_pid
+  )
+
   success, result = exec_in_awesome(assign_code)
-  
+
   if success then
     if result:match("^ASSIGN_SUCCESS:") then
       print("  ✓", result:gsub("^ASSIGN_SUCCESS: ", ""))
@@ -285,11 +307,12 @@ for i, test in ipairs(property_tests) do
     print("  ✗ Property assignment failed:", result)
     goto continue
   end
-  
+
   -- Step 4: Verify properties can be read back
   print("4. Verifying property persistence...")
   for property_name, expected_value in pairs(test.properties) do
-    local verify_code = string.format([[
+    local verify_code = string.format(
+      [[
       local tracker = _G.diligent_property_tracker
       local exists, value = tracker.verify_property_persistence(%s, "%s")
       
@@ -298,28 +321,42 @@ for i, test in ipairs(property_tests) do
       else
         return "PROPERTY_MISSING: %s"
       end
-    ]], spawn_pid, property_name, property_name, property_name)
-    
+    ]],
+      spawn_pid,
+      property_name,
+      property_name,
+      property_name
+    )
+
     success, result = exec_in_awesome(verify_code)
-    
+
     if success then
       if result:match("^PROPERTY_FOUND:") then
         local found_value = result:match("= (.+)$")
         if found_value == tostring(expected_value) then
           print(string.format("  ✓ %s = %s", property_name, found_value))
         else
-          print(string.format("  ⚠️ %s = %s (expected: %s)", property_name, found_value, tostring(expected_value)))
+          print(
+            string.format(
+              "  ⚠️ %s = %s (expected: %s)",
+              property_name,
+              found_value,
+              tostring(expected_value)
+            )
+          )
         end
       else
         print(string.format("  ✗ %s missing", property_name))
       end
     else
-      print(string.format("  ✗ Failed to verify %s: %s", property_name, result))
+      print(
+        string.format("  ✗ Failed to verify %s: %s", property_name, result)
+      )
     end
   end
-  
+
   print()
-  
+
   ::continue::
 end
 

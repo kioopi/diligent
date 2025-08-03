@@ -32,26 +32,26 @@ local test_apps = {
     name = "Terminal (simple)",
     cmd = "xterm",
     description = "Simple terminal application",
-    expected_behavior = "Direct PID match"
+    expected_behavior = "Direct PID match",
   },
   {
     name = "Text Editor (GUI)",
     cmd = "gedit",
     description = "GUI text editor",
-    expected_behavior = "Direct PID match"
+    expected_behavior = "Direct PID match",
   },
   {
     name = "Calculator (lightweight)",
     cmd = "xcalc",
     description = "Simple calculator",
-    expected_behavior = "Direct PID match"
+    expected_behavior = "Direct PID match",
   },
   {
     name = "File Manager",
     cmd = "nemo",
     description = "File manager application",
-    expected_behavior = "May have wrapper processes"
-  }
+    expected_behavior = "May have wrapper processes",
+  },
 }
 
 print("Testing PID matching across different application types...")
@@ -159,10 +159,11 @@ for i, app in ipairs(test_apps) do
   print(string.format("Test %d: %s (%s)", i, app.name, app.cmd))
   print("Expected: " .. app.expected_behavior)
   print(string.rep("-", 50))
-  
+
   -- Step 1: Spawn the application
   print("1. Spawning application...")
-  local spawn_code = string.format([[
+  local spawn_code = string.format(
+    [[
     local awful = require("awful")
     local tracker = _G.diligent_spawn_tracker
     
@@ -175,38 +176,41 @@ for i, app in ipairs(test_apps) do
       return "SPAWN_SUCCESS: PID=" .. pid .. ", SNID=" .. (snid or "nil") .. 
              ", Time=" .. spawn_time
     end
-  ]], app.cmd, app.cmd)
-  
+  ]],
+    app.cmd,
+    app.cmd
+  )
+
   success, result = exec_in_awesome(spawn_code)
-  
+
   if not success then
     print("  ✗ Spawn failed:", result)
     goto continue
   end
-  
+
   if result:match("^SPAWN_ERROR:") then
     print("  ✗", result:gsub("^SPAWN_ERROR: ", ""))
     goto continue
   end
-  
+
   print("  ✓", result:gsub("^SPAWN_SUCCESS: ", ""))
-  
+
   -- Extract PID for tracking
   local spawn_pid = result:match("PID=(%d+)")
   if not spawn_pid then
     print("  ✗ Could not extract PID from spawn result")
     goto continue
   end
-  
+
   -- Step 2: Wait for client to appear and check for matches
   print("2. Waiting for client to appear...")
-  local max_wait = 10  -- seconds
+  local max_wait = 10 -- seconds
   local found_match = false
-  
+
   for wait_time = 1, max_wait do
     -- Wait a bit
     os.execute("sleep 1")
-    
+
     -- Check for matches
     success, result = exec_in_awesome([[
       local tracker = _G.diligent_spawn_tracker
@@ -216,12 +220,13 @@ for i, app in ipairs(test_apps) do
       return string.format("Matches: %d, Total spawns: %d, Matched: %d",
         matches_found, summary.total_spawns, summary.matched_spawns)
     ]])
-    
+
     if success then
       print(string.format("  Wait %ds: %s", wait_time, result))
-      
+
       -- Check if our specific PID was matched
-      success, match_result = exec_in_awesome(string.format([[
+      success, match_result = exec_in_awesome(string.format(
+        [[
         local tracker = _G.diligent_spawn_tracker
         local spawn_data = tracker.spawns[%s]
         
@@ -231,8 +236,10 @@ for i, app in ipairs(test_apps) do
         else
           return "NOT_MATCHED"
         end
-      ]], spawn_pid))
-      
+      ]],
+        spawn_pid
+      ))
+
       if success and match_result:match("^MATCHED:") then
         print("  ✓", match_result:gsub("^MATCHED: ", ""))
         found_match = true
@@ -240,13 +247,13 @@ for i, app in ipairs(test_apps) do
       end
     end
   end
-  
+
   if not found_match then
     print("  ⚠️ No match found within " .. max_wait .. " seconds")
   end
-  
+
   print()
-  
+
   ::continue::
 end
 

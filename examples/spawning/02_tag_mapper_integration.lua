@@ -172,22 +172,24 @@ print("Test 3: Tag Resolution Testing")
 print("------------------------------")
 
 local test_specs = {
-  {spec = 0, desc = "Current tag"},
-  {spec = 2, desc = "Current + 2"},
-  {spec = -1, desc = "Current - 1"},
-  {spec = "3", desc = "Absolute tag 3"},
-  {spec = "test_tag", desc = "Named tag 'test_tag'"},
-  {spec = 99, desc = "Invalid relative (+99)"},
-  {spec = "999", desc = "Invalid absolute (999)"}
+  { spec = 0, desc = "Current tag" },
+  { spec = 2, desc = "Current + 2" },
+  { spec = -1, desc = "Current - 1" },
+  { spec = "3", desc = "Absolute tag 3" },
+  { spec = "test_tag", desc = "Named tag 'test_tag'" },
+  { spec = 99, desc = "Invalid relative (+99)" },
+  { spec = "999", desc = "Invalid absolute (999)" },
 }
 
 for _, test in ipairs(test_specs) do
   print(string.format("Testing: %s (%s)", tostring(test.spec), test.desc))
-  
+
   local lua_code = [[
     local awful = require("awful")
     local screen = awful.screen.focused()
-    local tag_spec = ]] .. (type(test.spec) == "string" and '"' .. test.spec .. '"' or tostring(test.spec)) .. [[
+    local tag_spec = ]] .. (type(test.spec) == "string" and '"' .. test.spec .. '"' or tostring(
+    test.spec
+  )) .. [[
     local success, result = _G.test_tag_mapper.dry_run_tag_resolution(tag_spec, screen)
     
     if success then
@@ -198,9 +200,9 @@ for _, test in ipairs(test_specs) do
       return "✗ " .. result
     end
   ]]
-  
+
   success, result = exec_in_awesome(lua_code)
-  
+
   if success then
     print("  " .. result)
   else
@@ -214,17 +216,26 @@ print("Test 4: Integrated Tag Resolution + Spawn")
 print("-----------------------------------------")
 
 local spawn_tests = {
-  {app = "xterm", tag_spec = 0, desc = "Current tag"},
-  {app = "xterm", tag_spec = "integration_test", desc = "New named tag"}
+  { app = "xterm", tag_spec = 0, desc = "Current tag" },
+  { app = "xterm", tag_spec = "integration_test", desc = "New named tag" },
 }
 
 for _, test in ipairs(spawn_tests) do
-  print(string.format("Spawning %s to %s (%s)", test.app, tostring(test.tag_spec), test.desc))
-  
+  print(
+    string.format(
+      "Spawning %s to %s (%s)",
+      test.app,
+      tostring(test.tag_spec),
+      test.desc
+    )
+  )
+
   local lua_code = [[
     local awful = require("awful")
     local screen = awful.screen.focused()
-    local tag_spec = ]] .. (type(test.tag_spec) == "string" and '"' .. test.tag_spec .. '"' or tostring(test.tag_spec)) .. [[
+    local tag_spec = ]] .. (type(test.tag_spec) == "string" and '"' .. test.tag_spec .. '"' or tostring(
+    test.tag_spec
+  )) .. [[
     local app = "]] .. test.app .. [["
     
     -- Step 1: Resolve tag
@@ -251,9 +262,9 @@ for _, test in ipairs(spawn_tests) do
              ", Tag=" .. (tag.name or "unnamed") .. "(" .. tag.index .. ")"
     end
   ]]
-  
+
   success, result = exec_in_awesome(lua_code)
-  
+
   if success then
     print("  " .. result)
   else

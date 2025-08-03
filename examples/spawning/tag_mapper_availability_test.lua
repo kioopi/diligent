@@ -23,7 +23,9 @@ end
 
 -- Check if AwesomeWM is available
 if not dbus_comm.check_awesome_available() then
-  print("✗ AwesomeWM not available via D-Bus. Make sure AwesomeWM is running.")
+  print(
+    "✗ AwesomeWM not available via D-Bus. Make sure AwesomeWM is running."
+  )
   os.exit(1)
 end
 
@@ -36,22 +38,25 @@ print("---------------------------------------------------")
 
 local core_modules = {
   "diligent",
-  "json_utils", 
+  "json_utils",
   "cli_printer",
   "dbus_communication",
-  "commands.ping"
+  "commands.ping",
 }
 
 for _, module_name in ipairs(core_modules) do
-  local success, result = exec_in_awesome(string.format([[
+  local success, result = exec_in_awesome(string.format(
+    [[
     local success, module = pcall(require, "%s")
     if success then
       return "AVAILABLE: " .. type(module)
     else
       return "NOT_FOUND: " .. tostring(module)
     end
-  ]], module_name))
-  
+  ]],
+    module_name
+  ))
+
   if success then
     print(string.format("  %-20s %s", module_name .. ":", result))
   else
@@ -68,19 +73,22 @@ local diligent_submodules = {
   "diligent.utils",
   "diligent.handlers.ping",
   "diligent.handlers.spawn_test",
-  "diligent.handlers.kill_test"
+  "diligent.handlers.kill_test",
 }
 
 for _, module_name in ipairs(diligent_submodules) do
-  local success, result = exec_in_awesome(string.format([[
+  local success, result = exec_in_awesome(string.format(
+    [[
     local success, module = pcall(require, "%s")
     if success then
       return "AVAILABLE: " .. type(module)
     else
       return "NOT_FOUND: " .. tostring(module)
     end
-  ]], module_name))
-  
+  ]],
+    module_name
+  ))
+
   if success then
     print(string.format("  %-25s %s", module_name .. ":", result))
   else
@@ -95,24 +103,27 @@ print("-----------------------------------------------------")
 
 local tag_mapper_modules = {
   "tag_mapper.core",
-  "tag_mapper.integration", 
+  "tag_mapper.integration",
   "tag_mapper.interfaces.awesome_interface",
-  "tag_mapper.interfaces.dry_run_interface"
+  "tag_mapper.interfaces.dry_run_interface",
 }
 
 local available_count = 0
 local total_count = #tag_mapper_modules
 
 for _, module_name in ipairs(tag_mapper_modules) do
-  local success, result = exec_in_awesome(string.format([[
+  local success, result = exec_in_awesome(string.format(
+    [[
     local success, module = pcall(require, "%s")
     if success then
       return "AVAILABLE: " .. type(module)
     else
       return "NOT_FOUND: " .. tostring(module)
     end
-  ]], module_name))
-  
+  ]],
+    module_name
+  ))
+
   if success then
     if result:match("AVAILABLE:") then
       available_count = available_count + 1
@@ -129,8 +140,14 @@ print("Test 4: Tag Mapper Functionality Test")
 print("-------------------------------------")
 
 if available_count > 0 then
-  print(string.format("Found %d/%d tag_mapper modules available. Testing functionality...", available_count, total_count))
-  
+  print(
+    string.format(
+      "Found %d/%d tag_mapper modules available. Testing functionality...",
+      available_count,
+      total_count
+    )
+  )
+
   local success, result = exec_in_awesome([[
     local success, integration = pcall(require, "tag_mapper.integration")
     if not success then
@@ -150,7 +167,7 @@ if available_count > 0 then
       return "ERROR: Tag resolution failed: " .. tostring(tag_or_error)
     end
   ]])
-  
+
   if success then
     print("  " .. result)
   else
@@ -185,7 +202,13 @@ print()
 -- Summary
 print("=== Test Summary ===")
 print()
-print(string.format("Tag Mapper Module Availability: %d/%d modules found", available_count, total_count))
+print(
+  string.format(
+    "Tag Mapper Module Availability: %d/%d modules found",
+    available_count,
+    total_count
+  )
+)
 
 if available_count == 0 then
   print("✗ BASELINE: No tag_mapper modules available (expected)")
@@ -195,7 +218,12 @@ elseif available_count == total_count then
   print("  Rockspec modifications were successful")
 else
   print("⚠ PARTIAL: Some tag_mapper modules available")
-  print(string.format("  %d missing modules need to be added to rockspec", total_count - available_count))
+  print(
+    string.format(
+      "  %d missing modules need to be added to rockspec",
+      total_count - available_count
+    )
+  )
 end
 
 print()

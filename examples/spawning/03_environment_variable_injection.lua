@@ -31,21 +31,21 @@ local test_scenarios = {
   {
     project = "test-project-1",
     description = "Simple project name",
-    additional_vars = {}
+    additional_vars = {},
   },
   {
     project = "complex-project_with-chars",
     description = "Project with special characters",
-    additional_vars = {}
+    additional_vars = {},
   },
   {
     project = "project-with-data",
     description = "Project with additional metadata",
     additional_vars = {
       DILIGENT_WORKSPACE = "/home/user/projects/test",
-      DILIGENT_START_TIME = "2025-01-02T12:00:00Z"
-    }
-  }
+      DILIGENT_START_TIME = "2025-01-02T12:00:00Z",
+    },
+  },
 }
 
 print("Testing environment variable injection across different scenarios...")
@@ -176,22 +176,23 @@ for i, scenario in ipairs(test_scenarios) do
   print(string.format("Test %d: %s", i, scenario.description))
   print("Project: " .. scenario.project)
   print(string.rep("-", 50))
-  
+
   -- Build environment variables for this test
-  local env_vars = {DILIGENT_PROJECT = scenario.project}
+  local env_vars = { DILIGENT_PROJECT = scenario.project }
   for key, value in pairs(scenario.additional_vars) do
     env_vars[key] = value
   end
-  
+
   print("Environment variables to inject:")
   for key, value in pairs(env_vars) do
     print("  " .. key .. "=" .. value)
   end
   print()
-  
+
   -- Step 1: Spawn application with environment variables
   print("1. Spawning with environment injection...")
-  local spawn_code = string.format([[
+  local spawn_code = string.format(
+    [[
     local tracker = _G.diligent_env_tracker
     local env_vars = %s
     
@@ -202,44 +203,51 @@ for i, scenario in ipairs(test_scenarios) do
     else
       return "SPAWN_SUCCESS: PID=" .. pid .. ", SNID=" .. (snid or "nil")
     end
-  ]], string.format("{%s}", table.concat(
-    (function()
-      local pairs_str = {}
-      for k, v in pairs(env_vars) do
-        table.insert(pairs_str, string.format('["%s"]="%s"', k, v))
-      end
-      return pairs_str
-    end)(), ", "
-  )))
-  
+  ]],
+    string.format(
+      "{%s}",
+      table.concat(
+        (function()
+          local pairs_str = {}
+          for k, v in pairs(env_vars) do
+            table.insert(pairs_str, string.format('["%s"]="%s"', k, v))
+          end
+          return pairs_str
+        end)(),
+        ", "
+      )
+    )
+  )
+
   success, result = exec_in_awesome(spawn_code)
-  
+
   if not success then
     print("  ✗ Spawn failed:", result)
     goto continue
   end
-  
+
   if result:match("^SPAWN_ERROR:") then
     print("  ✗", result:gsub("^SPAWN_ERROR: ", ""))
     goto continue
   end
-  
+
   print("  ✓", result:gsub("^SPAWN_SUCCESS: ", ""))
-  
+
   -- Extract PID for verification
   local spawn_pid = result:match("PID=(%d+)")
   if not spawn_pid then
     print("  ✗ Could not extract PID from spawn result")
     goto continue
   end
-  
+
   -- Step 2: Wait for process to be established
   print("2. Waiting for process to establish...")
   os.execute("sleep 2")
-  
+
   -- Step 3: Verify environment variables
   print("3. Verifying environment injection...")
-  local verify_code = string.format([[
+  local verify_code = string.format(
+    [[
     local tracker = _G.diligent_env_tracker
     local expected_vars = %s
     
@@ -270,18 +278,25 @@ for i, scenario in ipairs(test_scenarios) do
       
       return table.concat(lines, "\n")
     end
-  ]], string.format("{%s}", table.concat(
-    (function()
-      local pairs_str = {}
-      for k, v in pairs(env_vars) do
-        table.insert(pairs_str, string.format('["%s"]="%s"', k, v))
-      end
-      return pairs_str
-    end)(), ", "
-  )), spawn_pid)
-  
+  ]],
+    string.format(
+      "{%s}",
+      table.concat(
+        (function()
+          local pairs_str = {}
+          for k, v in pairs(env_vars) do
+            table.insert(pairs_str, string.format('["%s"]="%s"', k, v))
+          end
+          return pairs_str
+        end)(),
+        ", "
+      )
+    ),
+    spawn_pid
+  )
+
   success, result = exec_in_awesome(verify_code)
-  
+
   if success then
     if result:match("^VERIFY_SUCCESS:") then
       print("  ✓ Environment verification results:")
@@ -296,9 +311,9 @@ for i, scenario in ipairs(test_scenarios) do
   else
     print("  ✗ Verification failed:", result)
   end
-  
+
   print()
-  
+
   ::continue::
 end
 
