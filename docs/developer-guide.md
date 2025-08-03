@@ -479,26 +479,31 @@ lua -v && luarocks --version && stylua --version && selene --version
 
 ## Code Style Guidelines
 
-### Lua Conventions
+For comprehensive coding standards and API design patterns, see **[Coding Guidelines](coding-guidelines.md)**.
+
+### Quick Reference
 
 - Use 2-space indentation
 - Prefer double quotes for strings
 - Always use parentheses for function calls
-- Follow AwesomeWM coding patterns for WM integration
+- Follow established API patterns for consistency
 
-### Naming Conventions
+### API Design Standards
 
-- `snake_case` for variables and functions
-- `PascalCase` for modules/classes
-- `UPPER_CASE` for constants
-- Descriptive names over short names
+All functions should follow these patterns:
+- **Signature**: `function module.operation(primary_input, context, options)`
+- **Returns**: `return success, result, metadata`
+- **Validation**: Always validate inputs with clear error messages
 
-### Documentation
+### Documentation Requirements
 
-- Add LuaDoc comments for public functions
+- Use Lua Language Server annotations for type safety
+- Add LuaDoc comments for all public functions
 - Update README.md for user-facing changes
 - Update this developer guide for workflow changes
 - Keep planning documents current
+
+**See [Coding Guidelines](coding-guidelines.md) for detailed examples and patterns.**
 
 ## Release Process
 
