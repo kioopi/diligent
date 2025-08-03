@@ -448,200 +448,48 @@ function awesome_client_manager.wait_and_set_properties(
 end
 
 --==============================================================================
--- ERROR REPORTING FRAMEWORK
+-- ERROR REPORTING FRAMEWORK (using awe.error modules)
 --==============================================================================
 
--- Error classification constants
-awesome_client_manager.ERROR_TYPES = {
-  COMMAND_NOT_FOUND = "COMMAND_NOT_FOUND",
-  PERMISSION_DENIED = "PERMISSION_DENIED",
-  INVALID_COMMAND = "INVALID_COMMAND",
-  TIMEOUT = "TIMEOUT",
-  DEPENDENCY_FAILED = "DEPENDENCY_FAILED",
-  TAG_RESOLUTION_FAILED = "TAG_RESOLUTION_FAILED",
-  UNKNOWN = "UNKNOWN",
-}
+-- Create error handler instance
+local error_handler = require("awe.error").create()
 
--- Classify error message into error type
+-- Expose ERROR_TYPES for backward compatibility
+awesome_client_manager.ERROR_TYPES = error_handler.classifier.ERROR_TYPES
+
+-- Delegate error classification to new module
 function awesome_client_manager.classify_error(error_message)
-  if not error_message or type(error_message) ~= "string" then
-    return awesome_client_manager.ERROR_TYPES.UNKNOWN,
-      "No error message provided"
-  end
-
-  local msg_lower = error_message:lower()
-
-  if msg_lower:find("no such file or directory") then
-    return awesome_client_manager.ERROR_TYPES.COMMAND_NOT_FOUND,
-      "Command not found in PATH"
-  elseif msg_lower:find("permission denied") then
-    return awesome_client_manager.ERROR_TYPES.PERMISSION_DENIED,
-      "Insufficient permissions to execute"
-  elseif
-    msg_lower:find("no command to execute") or error_message:match("^%s*$")
-  then
-    return awesome_client_manager.ERROR_TYPES.INVALID_COMMAND,
-      "Empty or invalid command"
-  elseif msg_lower:find("timeout") then
-    return awesome_client_manager.ERROR_TYPES.TIMEOUT, "Operation timed out"
-  elseif msg_lower:find("tag resolution failed") then
-    return awesome_client_manager.ERROR_TYPES.TAG_RESOLUTION_FAILED,
-      "Could not resolve tag specification"
-  else
-    return awesome_client_manager.ERROR_TYPES.UNKNOWN,
-      "Unclassified error: " .. error_message
-  end
+  return error_handler.classifier.classify_error(error_message)
 end
 
--- Create structured error report
+-- Delegate error report creation to new module
 function awesome_client_manager.create_error_report(
   app_name,
   tag_spec,
   error_message,
   context
 )
-  context = context or {}
-
-  local error_type, user_message =
-    awesome_client_manager.classify_error(error_message)
-
-  return {
-    timestamp = os.time(),
-    app_name = app_name,
-    tag_spec = tag_spec,
-    error_type = error_type,
-    original_message = error_message,
-    user_message = user_message,
-    context = context,
-    suggestions = awesome_client_manager.get_error_suggestions(
-      error_type,
-      app_name
-    ),
-  }
-end
-
--- Get actionable suggestions for error types
-function awesome_client_manager.get_error_suggestions(error_type, app_name)
-  if error_type == awesome_client_manager.ERROR_TYPES.COMMAND_NOT_FOUND then
-    return {
-      "Check if '" .. (app_name or "application") .. "' is installed",
-      "Verify the command name is spelled correctly",
-      "Add the application's directory to your PATH",
-    }
-  elseif error_type == awesome_client_manager.ERROR_TYPES.PERMISSION_DENIED then
-    return {
-      "Check file permissions for the executable",
-      "Ensure you have execute permissions",
-      "Try running with appropriate privileges",
-    }
-  elseif error_type == awesome_client_manager.ERROR_TYPES.INVALID_COMMAND then
-    return {
-      "Provide a valid command to execute",
-      "Check command syntax",
-      "Ensure command is not empty",
-    }
-  elseif error_type == awesome_client_manager.ERROR_TYPES.TIMEOUT then
-    return {
-      "Increase timeout value for slow-starting applications",
-      "Check if application started but didn't create a window",
-      "Try spawning manually to test behavior",
-    }
-  elseif
-    error_type == awesome_client_manager.ERROR_TYPES.TAG_RESOLUTION_FAILED
-  then
-    return {
-      'Check tag specification format (0, +N, -N, N, or "name")',
-      "Ensure target tag exists or can be created",
-      "Verify screen has available tag slots",
-    }
-  else
-    return {
-      "Check application logs for more details",
-      "Try spawning the application manually",
-      "Report this issue if problem persists",
-    }
-  end
-end
-
--- Aggregate multiple spawn results into comprehensive report
-function awesome_client_manager.create_spawn_summary(spawn_results)
-  local summary = {
-    timestamp = os.time(),
-    total_attempts = #spawn_results,
-    successful = 0,
-    failed = 0,
-    results = spawn_results,
-    error_types = {},
-    recommendations = {},
-  }
-
-  -- Analyze results
-  for _, result in ipairs(spawn_results) do
-    if result.success then
-      summary.successful = summary.successful + 1
-    else
-      summary.failed = summary.failed + 1
-
-      -- Count error types
-      local error_type = result.error_report and result.error_report.error_type
-        or "UNKNOWN"
-      summary.error_types[error_type] = (summary.error_types[error_type] or 0)
-        + 1
-    end
-  end
-
-  -- Generate recommendations based on error patterns
-  if
-    summary.error_types[awesome_client_manager.ERROR_TYPES.COMMAND_NOT_FOUND]
-  then
-    table.insert(
-      summary.recommendations,
-      "Some applications may not be installed"
-    )
-  end
-  if
-    summary.error_types[awesome_client_manager.ERROR_TYPES.PERMISSION_DENIED]
-  then
-    table.insert(
-      summary.recommendations,
-      "Permission issues detected - check file permissions"
-    )
-  end
-  if summary.failed > summary.successful then
-    table.insert(
-      summary.recommendations,
-      "Consider reviewing project configuration"
-    )
-  end
-
-  summary.success_rate = summary.total_attempts > 0
-      and (summary.successful / summary.total_attempts)
-    or 0
-
-  return summary
-end
-
--- Format error report for user display
-function awesome_client_manager.format_error_for_user(error_report)
-  if not error_report then
-    return "Unknown error occurred"
-  end
-
-  local lines = {}
-  table.insert(
-    lines,
-    "✗ Failed to spawn " .. (error_report.app_name or "application")
+  return error_handler.reporter.create_error_report(
+    app_name,
+    tag_spec,
+    error_message,
+    context
   )
-  table.insert(lines, "  Error: " .. error_report.user_message)
+end
 
-  if error_report.suggestions and #error_report.suggestions > 0 then
-    table.insert(lines, "  Suggestions:")
-    for _, suggestion in ipairs(error_report.suggestions) do
-      table.insert(lines, "    • " .. suggestion)
-    end
-  end
+-- Delegate error suggestions to new module
+function awesome_client_manager.get_error_suggestions(error_type, app_name)
+  return error_handler.reporter.get_error_suggestions(error_type, app_name)
+end
 
-  return table.concat(lines, "\n")
+-- Delegate spawn summary creation to new module
+function awesome_client_manager.create_spawn_summary(spawn_results)
+  return error_handler.reporter.create_spawn_summary(spawn_results)
+end
+
+-- Delegate error formatting to new module
+function awesome_client_manager.format_error_for_user(error_report)
+  return error_handler.formatter.format_error_for_user(error_report)
 end
 
 -- Enhanced spawn function with comprehensive error reporting
