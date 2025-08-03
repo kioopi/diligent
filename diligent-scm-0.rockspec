@@ -24,7 +24,9 @@ build = {
       json_utils = "lua/json_utils.lua",
       cli_printer = "lua/cli_printer.lua",
       dbus_communication = "lua/dbus_communication.lua",
-      ["commands.ping"] = "lua/commands/ping.lua"
+      ["commands.ping"] = "cli/commands/ping.lua",
+      ["tag_mapper"] = "lua/tag_mapper/init.lua",
+      ["awesome_client_manager"] = "lua/awesome_client_manager.lua"
    },
    install = {
       bin = {
