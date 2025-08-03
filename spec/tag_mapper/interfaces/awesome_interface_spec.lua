@@ -44,7 +44,7 @@ describe("awesome_interface", function()
     -- Mock AwesomeWM dependencies
     _G.awful = mock_awful
 
-    awesome_interface = require("awe.interfaces.awesome_interface")
+    awesome_interface = require("awe").interfaces.awesome_interface
   end)
 
   after_each(function()

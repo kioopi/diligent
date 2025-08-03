@@ -17,8 +17,8 @@ describe("tag_mapper.integration", function()
     tag_mapper_core = require("tag_mapper.core")
 
     -- Load both interfaces for testing
-    awesome_interface = require("awe.interfaces.awesome_interface")
-    dry_run_interface = require("awe.interfaces.dry_run_interface")
+    awesome_interface = require("awe").interfaces.awesome_interface
+    dry_run_interface = require("awe").interfaces.dry_run_interface
 
     -- Clear dry-run state
     dry_run_interface.clear_execution_log()

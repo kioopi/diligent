@@ -6,7 +6,7 @@ describe("awe.interfaces.mock_interface", function()
   before_each(function()
     -- Clean module cache to get fresh instance
     package.loaded["awe.interfaces.mock_interface"] = nil
-    mock_interface = require("awe.interfaces.mock_interface")
+    mock_interface = require("awe").interfaces.mock_interface
   end)
 
   describe("get_screen_context", function()

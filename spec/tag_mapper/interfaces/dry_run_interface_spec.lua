@@ -6,7 +6,7 @@ describe("tag_mapper.interfaces.dry_run_interface", function()
   before_each(function()
     -- Clean module cache to get fresh instance
     package.loaded["awe.interfaces.dry_run_interface"] = nil
-    dry_run_interface = require("awe.interfaces.dry_run_interface")
+    dry_run_interface = require("awe").interfaces.dry_run_interface
 
     -- Clear execution log for test isolation
     dry_run_interface.clear_execution_log()

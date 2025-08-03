@@ -110,4 +110,43 @@ function awesome_interface.create_named_tag(name, screen)
   return nil
 end
 
+---Get all clients from AwesomeWM
+---@return table clients List of all client objects
+function awesome_interface.get_clients()
+  if client and client.get then
+    return client.get()
+  end
+  return {}
+end
+
+---Read process environment variables
+---@param pid number Process ID
+---@return table|nil env_vars Environment variables or nil if not accessible
+function awesome_interface.get_process_env(pid)
+  local env_file = "/proc/" .. pid .. "/environ"
+  local file = io.open(env_file, "r")
+
+  if not file then
+    return nil
+  end
+
+  local content = file:read("*all")
+  file:close()
+
+  if not content then
+    return nil
+  end
+
+  -- Parse environment variables (null-separated)
+  local env_vars = {}
+  for var in content:gmatch("([^%z]+)") do
+    local key, value = var:match("^([^=]+)=(.*)$")
+    if key then
+      env_vars[key] = value
+    end
+  end
+
+  return env_vars
+end
+
 return awesome_interface

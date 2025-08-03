@@ -7,6 +7,12 @@ for testing purposes. All operations are simulated and deterministic.
 
 local mock_interface = {}
 
+-- Mock data storage
+local mock_data = {
+  clients = {},
+  process_envs = {},
+}
+
 ---Get mock screen context information
 ---Returns consistent mock data for testing
 ---@param screen table|nil Optional screen object (ignored, uses mock data)
@@ -62,6 +68,39 @@ function mock_interface.create_named_tag(name, screen)
 
   -- Return mock tag object
   return { name = name, index = 2 }
+end
+
+---Reset mock data to clean state
+---Used for test setup
+function mock_interface.reset()
+  mock_data.clients = {}
+  mock_data.process_envs = {}
+end
+
+---Set mock clients for testing
+---@param clients table List of mock client objects
+function mock_interface.set_clients(clients)
+  mock_data.clients = clients or {}
+end
+
+---Get all mock clients
+---@return table clients List of all mock clients
+function mock_interface.get_clients()
+  return mock_data.clients
+end
+
+---Set process environment data for a PID
+---@param pid number Process ID
+---@param env_vars table Environment variables for the process
+function mock_interface.set_process_env(pid, env_vars)
+  mock_data.process_envs[pid] = env_vars or {}
+end
+
+---Get process environment data for a PID
+---@param pid number Process ID
+---@return table|nil env_vars Environment variables or nil if not found
+function mock_interface.get_process_env(pid)
+  return mock_data.process_envs[pid]
 end
 
 return mock_interface

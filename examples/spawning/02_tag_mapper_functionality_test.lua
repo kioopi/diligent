@@ -64,7 +64,7 @@ print("------------------------------")
 
 success, result = exec_in_awesome([[
   local tag_mapper = require("tag_mapper")
-  local dry_run_interface = require("awe.interfaces.dry_run_interface")
+  local dry_run_interface = require("awe").interfaces.dry_run_interface
   
   -- Create mock screen context for testing
   local mock_screen_context = {
@@ -149,7 +149,7 @@ print("------------------------")
 
 success, result = exec_in_awesome([[
   local tag_mapper = require("tag_mapper")
-  local dry_run_interface = require("awe.interfaces.dry_run_interface")
+  local dry_run_interface = require("awe").interfaces.dry_run_interface
   
   local start_time = os.clock()
   

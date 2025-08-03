@@ -27,10 +27,7 @@ build = {
       ["commands.ping"] = "cli/commands/ping.lua",
       ["tag_mapper"] = "lua/tag_mapper/init.lua",
       ["awesome_client_manager"] = "lua/awesome_client_manager.lua",
-      ["awe"] = "lua/awe/init.lua",
-      ["awe.interfaces.awesome_interface"] = "lua/awe/interfaces/awesome_interface.lua",
-      ["awe.interfaces.dry_run_interface"] = "lua/awe/interfaces/dry_run_interface.lua",
-      ["awe.interfaces.mock_interface"] = "lua/awe/interfaces/mock_interface.lua"
+      ["awe"] = "lua/awe/init.lua"
    },
    install = {
       bin = {

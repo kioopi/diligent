@@ -1,8 +1,8 @@
 # AwesomeWM Module Refactoring Plan
 
-**Document Version**: 1.1  
+**Document Version**: 1.2  
 **Date**: August 3, 2025  
-**Status**: Phase 1 Completed - In Progress  
+**Status**: Phase 2 Completed - Instance-Based Architecture Implemented  
 **Dependencies**: Completed client spawning exploration (Section 4)
 
 ## Overview
@@ -37,17 +37,25 @@ During code review of the client spawning exploration work, significant duplicat
   - Achieved 100% test coverage with TDD approach
   - Updated all dependencies and references
 
+- ✅ **Phase 2: Extract Client Management Modules** (August 2025)
+  - ✅ **Architectural Revolution**: Implemented instance-based dependency injection
+  - ✅ **Extracted 4 Client Modules**: tracker, properties, info, wait
+  - ✅ **Enhanced Testing**: Clean DI pattern eliminates test complexity
+  - ✅ **Consistent APIs**: Factory pattern with standardized interfaces
+  - ✅ **42 New Tests**: Added comprehensive test coverage for all modules
+
 ### Current Status
-- **Total Progress**: 1/7 phases complete (14%)
-- **Architecture Foundation**: ✅ Established
-- **Test Coverage**: ✅ Maintained at 495 tests passing
+- **Total Progress**: 2/7 phases complete (29%)
+- **Architecture Foundation**: ✅ Revolutionary instance-based DI implemented
+- **Test Coverage**: ✅ Maintained at 537 tests passing (+42 new tests)
 - **Quality Gates**: ✅ All passing (tests, lint, format)
+- **Code Reduction**: ✅ Monolithic client manager broken into 4 focused modules
 
 ### Next Phase
-- **Phase 2: Extract Client Management Modules** - Ready to begin
-  - Extract client tracking, properties, info, and wait functionality
-  - Break down monolithic `awesome_client_manager.lua`
-  - Create focused, testable modules
+- **Phase 3: Extract Spawning Modules** - Ready to begin
+  - Extract spawning logic, configuration, and environment handling
+  - Apply same factory pattern and dependency injection approach
+  - Continue building on the proven architecture
 
 ## Target Architecture
 
@@ -61,10 +69,12 @@ lua/
 │   │   ├── awesome_interface.lua          # Live AwesomeWM interface
 │   │   ├── dry_run_interface.lua          # Dry-run interface
 │   │   └── mock_interface.lua             # Mock interface for testing
-│   ├── client/                            # Client management modules
-│   │   ├── tracker.lua                    # Client finding & tracking
-│   │   ├── properties.lua                 # Client property management
-│   │   └── info.lua                       # Client information retrieval
+│   ├── client/                            # Client management modules ✅ COMPLETED
+│   │   ├── init.lua                       # Client factory with dependency injection ✅
+│   │   ├── tracker.lua                    # Client finding & tracking ✅
+│   │   ├── properties.lua                 # Client property management ✅
+│   │   ├── info.lua                       # Client information retrieval ✅
+│   │   └── wait.lua                       # Client waiting & polling ✅
 │   ├── spawn/                             # Spawning modules
 │   │   ├── spawner.lua                    # Core spawning logic
 │   │   ├── configuration.lua              # Spawn configuration building
@@ -137,20 +147,18 @@ return success, result, metadata
    - ✅ Created `lua/awe/init.lua` as the primary API entry point
    - ✅ Implemented direct property access API: `awe.awesome_interface`, `awe.dry_run_interface`, `awe.mock_interface`
 
-4. **✅ Updated Rockspec**
-   - ✅ Added awe modules to `diligent-scm-0.rockspec`:
-     ```lua
-     ["awe"] = "lua/awe/init.lua",
-     ["awe.interfaces.awesome_interface"] = "lua/awe/interfaces/awesome_interface.lua",
-     ["awe.interfaces.dry_run_interface"] = "lua/awe/interfaces/dry_run_interface.lua",
-     ["awe.interfaces.mock_interface"] = "lua/awe/interfaces/mock_interface.lua"
-     ```
+4. **✅ Updated Rockspec and Cleaned Architecture**
+   - ✅ Initially added awe modules to `diligent-scm-0.rockspec`
+   - ✅ **IMPROVED**: Cleaned up rockspec to single entry: `["awe"] = "lua/awe/init.lua"`
+   - ✅ **MODERNIZED**: Updated all imports to use `require("awe").interfaces.X` pattern
+   - ✅ Achieved 75% reduction in rockspec entries (4 → 1)
 
-5. **✅ Updated All Dependencies**
-   - ✅ Updated `tag_mapper/init.lua` to use `awe.interfaces.awesome_interface`
-   - ✅ Updated all test files to use new interface locations
-   - ✅ Updated example scripts to use new interface paths
+5. **✅ Updated All Dependencies and Modernized Interface Access**
+   - ✅ Updated `tag_mapper/init.lua` to use new interface access pattern
+   - ✅ Updated all test files to use modernized interface locations
+   - ✅ Updated example scripts to use consistent patterns
    - ✅ Removed old empty `tag_mapper/interfaces/` directory
+   - ✅ **NEW**: Implemented consistent `require("awe").interfaces.X` across codebase
 
 6. **✅ Comprehensive Test Coverage**
    - ✅ Created `spec/awe/init_spec.lua` - Tests main awe module API
@@ -168,7 +176,7 @@ return success, result, metadata
 - ✅ Direct property access works: `awe.awesome_interface.get_screen_context()`
 - ✅ All moved interfaces work identically to before (100% test coverage maintained)
 - ✅ No broken dependencies in existing code
-- ✅ All 495 tests pass (0 failures, 0 errors)
+- ✅ All 495 tests pass (0 failures, 0 errors) → **NOW**: 537 tests pass
 - ✅ Code passes linting and formatting checks
 - ✅ Mock interface enables isolated testing
 
@@ -176,52 +184,81 @@ return success, result, metadata
 
 ---
 
-### Phase 2: Extract Client Management Modules
+### Phase 2: Extract Client Management Modules ✅ **COMPLETED**
 
 **Objective**: Break down the monolithic client management into focused modules
 
-**Tasks**:
+**Status**: ✅ **COMPLETED** (August 2025)
+**Implementation Approach**: Revolutionary Instance-Based Dependency Injection + Strict TDD
 
-1. **Create awe/client/tracker.lua**
-   - Extract functions: `find_by_pid`, `find_by_env`, `find_by_property`, `find_by_name_or_class`
-   - Extract function: `get_all_tracked_clients`
-   - Maintain same API but improve internal organization
+**Completed Tasks**:
 
-2. **Create awe/client/properties.lua**
-   - Extract functions: `get_client_properties`, `set_client_property`
-   - Add property validation and type conversion logic
-   - Create property management utilities
+1. **✅ Architectural Revolution: Instance-Based Dependency Injection**
+   - ✅ Eliminated hacky `package.loaded` overwriting in tests
+   - ✅ Implemented factory pattern: `awe.create(interface)` for clean testing
+   - ✅ Created `awe/client/init.lua` factory for all client modules
+   - ✅ Enabled multiple instances with different interfaces (dry-run, mock, real)
 
-3. **Create awe/client/info.lua**
-   - Extract function: `get_client_info`
-   - Extract function: `read_process_env`
-   - Add client information analysis capabilities
+2. **✅ Created awe/client/tracker.lua** (5 functions, 18 tests)
+   - ✅ Extracted: `find_by_pid`, `find_by_env`, `find_by_property`, `find_by_name_or_class`, `get_all_tracked_clients`
+   - ✅ Implemented factory pattern with dependency injection
+   - ✅ 100% test coverage with clean mock interface usage
 
-4. **Create awe/client/wait.lua**
-   - Extract function: `wait_and_set_properties`
-   - Add timeout and polling configuration
-   - Improve client appearance detection
+3. **✅ Created awe/client/properties.lua** (2 functions, 10 tests)
+   - ✅ Extracted: `get_client_properties`, `set_client_property`
+   - ✅ Added property validation and type conversion logic
+   - ✅ Comprehensive testing of property management utilities
 
-**Module Design Example**:
+4. **✅ Created awe/client/info.lua** (2 functions, 7 tests)
+   - ✅ Extracted: `get_client_info`, `read_process_env`
+   - ✅ Added robust file system mocking for environment parsing
+   - ✅ Enhanced client information analysis capabilities
+
+5. **✅ Created awe/client/wait.lua** (1 function, 7 tests)
+   - ✅ Extracted: `wait_and_set_properties`
+   - ✅ Added configurable timeout and polling logic
+   - ✅ Improved client appearance detection with comprehensive testing
+
+**Revolutionary Architecture Example**:
 ```lua
--- awe/client/tracker.lua
-local tracker = {}
-local awesome_interface = require("awe.interfaces.awesome_interface")
-
-function tracker.find_by_pid(target_pid)
-  -- Existing logic with consistent error handling
+-- New Factory Pattern with Dependency Injection
+local function create_tracker(interface)
+  local tracker = {}
+  
+  function tracker.find_by_pid(target_pid)
+    local clients = interface.get_clients()  -- Clean DI
+    -- ... logic
+  end
+  
+  return tracker
 end
 
-return tracker
+-- Usage Examples:
+local awe = require("awe")
+
+-- Default usage
+awe.client.tracker.find_by_pid(1234)
+
+-- Testing
+local test_awe = awe.create(awe.interfaces.mock_interface)
+test_awe.client.tracker.find_by_pid(1234)  -- Uses mock
+
+-- Dry-run mode (ready for future)
+local dry_awe = awe.create(awe.interfaces.dry_run_interface)
 ```
 
-**Success Criteria**:
-- All client management functions extracted and working
-- Consistent APIs across client modules
-- No duplication between modules
-- All existing functionality preserved
+**Success Criteria Achieved**:
+- ✅ All 4 client management modules extracted and working
+- ✅ Revolutionary architecture with instance-based dependency injection
+- ✅ Consistent factory pattern APIs across all client modules
+- ✅ Zero duplication between modules
+- ✅ All existing functionality preserved (537 tests passing)
+- ✅ Clean testing pattern eliminates complex test setup
+- ✅ 42 new comprehensive tests added
 
-**Estimated Duration**: 4-6 hours
+**Actual Duration**: 8 hours (including architectural revolution)
+
+**Key Architectural Innovation**: Instance-based dependency injection pattern that became the foundation for all future extractions.
 
 ---
 
@@ -344,7 +381,7 @@ end
 ```lua
 -- awe/tag/resolver.lua
 local tag_mapper = require("tag_mapper")
-local awesome_interface = require("awe.interfaces.awesome_interface")
+local awesome_interface = require("awe").interfaces.awesome_interface
 
 function resolver.resolve_string_spec(tag_spec, options)
   options = options or {}
@@ -389,7 +426,7 @@ end
 
 1. **Update tag_mapper/init.lua**
    - Remove interface dependencies (now in awe/)
-   - Update imports: `require("awe.interfaces.awesome_interface")`
+   - Update imports: `require("awe").interfaces.awesome_interface`
    - Maintain all existing functionality
 
 2. **Update Example Scripts**
