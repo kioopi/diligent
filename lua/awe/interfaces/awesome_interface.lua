@@ -149,4 +149,30 @@ function awesome_interface.get_process_env(pid)
   return env_vars
 end
 
+---Spawn application using AwesomeWM awful.spawn
+---@param command string Command to execute
+---@param properties table Spawn properties
+---@return number|string pid Process ID or error string
+---@return string|nil snid Spawn notification ID
+function awesome_interface.spawn(command, properties)
+  if awful and awful.spawn then
+    return awful.spawn(command, properties)
+  end
+  return "awful.spawn not available"
+end
+
+---Get placement function from awful.placement
+---@param placement_name string Name of placement function
+---@return function|nil placement Placement function or nil
+function awesome_interface.get_placement(placement_name)
+  if awful and awful.placement and awful.placement[placement_name] then
+    return awful.placement[placement_name]
+  end
+  return nil
+end
+
+---Access to awesome_client_manager for tag resolution (temporary)
+---This will be removed in Phase 5 when tag resolution is extracted
+awesome_interface.awesome_client_manager = nil -- Will be set at runtime
+
 return awesome_interface

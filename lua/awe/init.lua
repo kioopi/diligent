@@ -20,10 +20,12 @@ Usage:
 
 local interfaces = require("awe.interfaces")
 local create_client = require("awe.client")
+local create_spawn = require("awe.spawn")
 
 local awe = {
   -- Default instance with awesome_interface
   client = create_client(interfaces.awesome_interface),
+  spawn = create_spawn(interfaces.awesome_interface),
 
   -- Direct access to interfaces
   interfaces = interfaces,
@@ -42,6 +44,7 @@ function awe.create(interface)
 
   return {
     client = create_client(interface),
+    spawn = create_spawn(interface),
     interfaces = interfaces,
   }
 end
