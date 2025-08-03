@@ -162,4 +162,76 @@ function dry_run_interface.clear_execution_log()
   tag_counter = 0
 end
 
+---Get all clients (simulated)
+---Returns empty list for dry-run mode with logging
+---@return table clients Empty list of clients
+function dry_run_interface.get_clients()
+  log_operation("get_clients", { result = "simulated_empty_list" })
+  return {}
+end
+
+---Read process environment variables (simulated)
+---Returns mock environment data for dry-run mode
+---@param pid number Process ID
+---@return table|nil env_vars Mock environment variables or nil
+function dry_run_interface.get_process_env(pid)
+  log_operation("get_process_env", { pid = pid })
+
+  -- Return mock environment for dry-run
+  if pid and pid > 0 then
+    return {
+      USER = "dry_run_user",
+      HOME = "/home/dry_run_user",
+      PATH = "/usr/bin:/bin",
+      DISPLAY = ":0",
+    }
+  end
+
+  return nil
+end
+
+---Spawn application (simulated)
+---Records spawn intent without actually executing
+---@param command string Command to execute
+---@param properties table Spawn properties
+---@return number|string pid Mock process ID or error string
+---@return string|nil snid Mock spawn notification ID
+function dry_run_interface.spawn(command, properties)
+  -- Log the spawn operation
+  log_operation("spawn", {
+    command = command,
+    properties = properties,
+    result = "simulated",
+  })
+
+  -- Return mock PID and snid for dry-run
+  local mock_pid = 9999
+  local mock_snid = "dry-run-snid-" .. os.time()
+
+  return mock_pid, mock_snid
+end
+
+---Get placement function (simulated)
+---Returns mock placement functions for dry-run mode
+---@param placement_name string Name of placement function
+---@return function|nil placement Mock placement function or nil
+function dry_run_interface.get_placement(placement_name)
+  log_operation("get_placement", { placement_name = placement_name })
+
+  -- Return mock placement functions
+  local mock_placements = {
+    centered = function()
+      return "dry_run_centered_placement"
+    end,
+    top_left = function()
+      return "dry_run_top_left_placement"
+    end,
+    bottom_right = function()
+      return "dry_run_bottom_right_placement"
+    end,
+  }
+
+  return mock_placements[placement_name]
+end
+
 return dry_run_interface

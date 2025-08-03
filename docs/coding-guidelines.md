@@ -15,7 +15,7 @@ This document establishes coding standards and API design patterns for the Dilig
 - [Error Handling Standards](#error-handling-standards)
 - [Documentation Standards](#documentation-standards)
 - [Code Organization](#code-organization)
-- [Testing Guidelines](#testing-guidelines)
+- [Testing Guidelines](testing-guidelines.md)
 - [Language Server Annotations](#language-server-annotations)
 - [Module Structure](#module-structure)
 
@@ -352,52 +352,12 @@ local DEFAULT_CONFIG = require("config.defaults")
 
 ## Testing Guidelines
 
-### Test Structure
+For comprehensive testing standards, patterns, and best practices, see [Testing Guidelines](testing-guidelines.md). This includes:
 
-Organize tests to mirror the module structure:
-
-```lua
-local assert = require("luassert")
-local module_name = require("module_name")
-
-describe("Module Name", function()
-  describe("public_operation", function()
-    it("should handle normal input correctly", function()
-      local success, result, metadata = module_name.public_operation("valid_input")
-      
-      assert.is_true(success)
-      assert.is_table(result)
-      assert.is_table(metadata)
-    end)
-    
-    it("should handle invalid input gracefully", function()
-      local success, result, metadata = module_name.public_operation(nil)
-      
-      assert.is_false(success)
-      assert.is_string(result)  -- Error message
-      assert.equals("MISSING_REQUIRED_PARAMETER", metadata.error_type)
-    end)
-    
-    it("should provide meaningful error messages", function()
-      local success, result, metadata = module_name.public_operation("invalid")
-      
-      assert.is_false(success)
-      assert.matches("primary_input is required", result)
-    end)
-  end)
-  
-  describe("error conditions", function()
-    -- Test error handling scenarios
-  end)
-end)
-```
-
-### Test Coverage Expectations
-
-- **≥80% coverage** for core functionality modules
-- **≥60% coverage** for integration modules
-- **100% coverage** for critical path functions
-- **All error conditions** should have test cases
+- Interface testing and mocking strategies
+- Anti-patterns to avoid (runtime patching, incomplete mocks)
+- Test structure and organization
+- Coverage requirements and quality standards
 
 ## Language Server Annotations
 

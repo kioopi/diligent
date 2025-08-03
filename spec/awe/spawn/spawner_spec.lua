@@ -13,29 +13,36 @@ describe("awe.spawn.spawner", function()
 
   before_each(function()
     mock_interface = awe.interfaces.mock_interface
+    mock_interface.reset() -- Ensure clean state for each test
     local spawn = awe.create(mock_interface).spawn
     spawner = spawn.spawner
   end)
 
   describe("spawn_simple", function()
     it("should be a convenience wrapper for spawn_with_properties", function()
-      -- Mock spawn_with_properties to verify it's called
-      local original_spawn = spawner.spawn_with_properties
-      local called_with = nil
-      spawner.spawn_with_properties = function(app, tag_spec, config)
-        called_with = { app, tag_spec, config }
-        return 1234, "snid", "test message"
-      end
+      -- Configure mock to return specific values
+      mock_interface.set_spawn_config({
+        success = true,
+        pid = 1234,
+        snid = "snid",
+      })
 
       local pid, snid, msg = spawner.spawn_simple("firefox", "+1")
 
-      assert.are.same({ "firefox", "+1", {} }, called_with)
+      -- Verify the interface was called with the expected parameters
+      local spawn_call = mock_interface.get_last_spawn_call()
+      assert.is_not_nil(spawn_call)
+
+      -- spawn_simple should call spawn_with_properties with empty config
+      -- which should result in interface.spawn being called
+      assert.is_truthy(spawn_call.command:match("firefox"))
+
+      -- Verify return values match what spawn_with_properties would return
       assert.are.equal(1234, pid)
       assert.are.equal("snid", snid)
-      assert.are.equal("test message", msg)
-
-      -- Restore original function
-      spawner.spawn_with_properties = original_spawn
+      assert.is_truthy(msg:match("SUCCESS"))
+      assert.is_truthy(msg:match("firefox"))
+      assert.is_truthy(msg:match("1234"))
     end)
   end)
 
@@ -76,11 +83,12 @@ describe("awe.spawn.spawner", function()
     end)
 
     it("should handle spawn success with mock interface", function()
-      -- For successful spawn, we need to properly mock the spawn behavior
-      mock_interface.spawn = function(command, properties)
-        -- Mock successful spawn
-        return 1234, "snid-123"
-      end
+      -- Configure mock to simulate successful spawn
+      mock_interface.set_spawn_config({
+        success = true,
+        pid = 1234,
+        snid = "snid-123",
+      })
 
       local pid, snid, msg = spawner.spawn_with_properties("firefox", "+1", {})
 
@@ -92,10 +100,11 @@ describe("awe.spawn.spawner", function()
     end)
 
     it("should handle spawn error with mock interface", function()
-      -- Mock spawn error
-      mock_interface.spawn = function(command, properties)
-        return "Command not found: firefox"
-      end
+      -- Configure mock to simulate spawn error
+      mock_interface.set_spawn_config({
+        success = false,
+        error = "Command not found: firefox",
+      })
 
       local pid, snid, msg = spawner.spawn_with_properties("firefox", "+1", {})
 
@@ -105,14 +114,12 @@ describe("awe.spawn.spawner", function()
     end)
 
     it("should build properties and command correctly", function()
-      local captured_command = nil
-      local captured_properties = nil
-
-      mock_interface.spawn = function(command, properties)
-        captured_command = command
-        captured_properties = properties
-        return 1234, "snid"
-      end
+      -- Configure mock for successful spawn
+      mock_interface.set_spawn_config({
+        success = true,
+        pid = 1234,
+        snid = "snid",
+      })
 
       local config = {
         floating = true,
@@ -122,19 +129,26 @@ describe("awe.spawn.spawner", function()
 
       spawner.spawn_with_properties("firefox", "+1", config)
 
+      -- Get the captured spawn call
+      local spawn_call = mock_interface.get_last_spawn_call()
+      assert.is_not_nil(spawn_call)
+
       -- Verify command includes environment variables
-      assert.is_truthy(captured_command:match("env DISPLAY=:1 firefox"))
+      assert.is_truthy(spawn_call.command:match("env DISPLAY=:1 firefox"))
 
       -- Verify properties include tag and config settings
-      assert.is_not_nil(captured_properties.tag)
-      assert.is_true(captured_properties.floating)
-      assert.are.equal(800, captured_properties.width)
+      assert.is_not_nil(spawn_call.properties.tag)
+      assert.is_true(spawn_call.properties.floating)
+      assert.are.equal(800, spawn_call.properties.width)
     end)
 
     it("should format success message correctly", function()
-      mock_interface.spawn = function(command, properties)
-        return 5678, "snid-456"
-      end
+      -- Configure mock for specific PID and snid
+      mock_interface.set_spawn_config({
+        success = true,
+        pid = 5678,
+        snid = "snid-456",
+      })
 
       local pid, snid, msg = spawner.spawn_with_properties("gedit", "work", {})
 
@@ -146,12 +160,12 @@ describe("awe.spawn.spawner", function()
     end)
 
     it("should handle complex configuration", function()
-      local captured_properties = nil
-
-      mock_interface.spawn = function(command, properties)
-        captured_properties = properties
-        return 9999, "snid-complex"
-      end
+      -- Configure mock for complex spawn scenario
+      mock_interface.set_spawn_config({
+        success = true,
+        pid = 9999,
+        snid = "snid-complex",
+      })
 
       local config = {
         floating = true,
@@ -168,10 +182,14 @@ describe("awe.spawn.spawner", function()
         spawner.spawn_with_properties("myapp", "+2", config)
 
       assert.are.equal(9999, pid)
-      assert.is_not_nil(captured_properties.tag)
-      assert.is_true(captured_properties.floating)
-      assert.are.equal(1024, captured_properties.width)
-      assert.are.equal(768, captured_properties.height)
+
+      -- Get the captured spawn call to verify properties
+      local spawn_call = mock_interface.get_last_spawn_call()
+      assert.is_not_nil(spawn_call)
+      assert.is_not_nil(spawn_call.properties.tag)
+      assert.is_true(spawn_call.properties.floating)
+      assert.are.equal(1024, spawn_call.properties.width)
+      assert.are.equal(768, spawn_call.properties.height)
     end)
   end)
 end)
