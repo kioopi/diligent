@@ -25,10 +25,20 @@ end
 print("Testing Error Reporting Framework...")
 
 local success, result = exec_in_awesome([[
-  -- Load the awesome_client_manager module
-  local success, acm = pcall(require, "awesome_client_manager")
+  -- Clear all awe-related modules from cache to ensure fresh load from local path
+  for k, v in pairs(package.loaded) do
+    if k:match("^awe") then
+      package.loaded[k] = nil
+    end
+  end
+  
+  -- Set package path to prioritize local project version
+  package.path = "/home/vt/projects/diligent/lua/?.lua;" .. package.path
+  
+  -- Load the awe module
+  local success, awe = pcall(require, "awe")
   if not success then
-    return "ERROR: Failed to load awesome_client_manager: " .. tostring(acm)
+    return "ERROR: Failed to load awe module: " .. tostring(awe)
   end
   
   -- Test error classification
@@ -42,7 +52,9 @@ local success, result = exec_in_awesome([[
   
   local classification_results = {}
   for i, error_msg in ipairs(test_errors) do
-    local error_type, user_message = acm.classify_error(error_msg)
+    local error_result = awe.error.classifier.classify_error(error_msg)
+    local error_type = error_result.type
+    local user_message = error_result.message
     table.insert(classification_results, string.format(
       "Test %d: %s -> %s (%s)", 
       i, error_type, user_message, error_msg:sub(1, 40) .. "..."
@@ -50,24 +62,44 @@ local success, result = exec_in_awesome([[
   end
   
   -- Test error report creation
-  local error_report = acm.create_error_report(
+  local error_report = awe.error.reporter.create_error_report(
     "nonexistentapp", 
     "0", 
     "Failed to execute child process \"nonexistentapp\" (No such file or directory)",
     {config = {floating = true}}
   )
   
-  -- Test spawn with error reporting
+  -- Test spawn with error reporting (implemented using awe modules)
   local spawn_results = {}
   local test_apps = {"invalidapp1", "invalidapp2", "xterm"}
   
   for _, app in ipairs(test_apps) do
-    local result = acm.spawn_with_error_reporting(app, "0", {})
+    local pid, snid, msg = awe.spawn.spawner.spawn_with_properties(app, "0", {})
+    
+    local result
+    if pid then
+      result = {
+        success = true,
+        pid = pid,
+        snid = snid,
+        app_name = app,
+        message = msg
+      }
+    else
+      local error_report = awe.error.reporter.create_error_report(app, "0", msg, {})
+      result = {
+        success = false,
+        app_name = app,
+        error_message = msg,
+        error_report = error_report
+      }
+    end
+    
     table.insert(spawn_results, result)
   end
   
   -- Create summary
-  local summary = acm.create_spawn_summary(spawn_results)
+  local summary = awe.error.reporter.create_spawn_summary(spawn_results)
   
   -- Format results for display
   local report = {}
@@ -105,7 +137,7 @@ local success, result = exec_in_awesome([[
   table.insert(report, "=== USER-FRIENDLY ERROR FORMAT ===")
   for _, result in ipairs(spawn_results) do
     if not result.success then
-      local formatted = acm.format_error_for_user(result.error_report)
+      local formatted = awe.error.formatter.format_error_for_user(result.error_report)
       table.insert(report, formatted)
       table.insert(report, "")
     end
