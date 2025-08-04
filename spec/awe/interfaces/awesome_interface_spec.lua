@@ -80,7 +80,7 @@ describe("awesome_interface", function()
       awful.screen.focused = function()
         return {
           selected_tag = nil,
-          tags = { create_mock_tag("1", 1) },
+          tags = { mock_awful.create_mock_tag("1", 1) },
         }
       end
 
