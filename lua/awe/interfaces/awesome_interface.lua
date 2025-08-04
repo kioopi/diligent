@@ -6,6 +6,21 @@ Centralizes screen, tag, and window management operations to eliminate
 code duplication and improve testability.
 --]]
 
+local awful_available, awful = pcall(require, "awful")
+
+if not _G._TEST then
+  if not awful_available then
+    error("Failed to load awful module: " .. tostring(awful))
+  end
+
+  local required_awful_modules = { "screen", "tag", "spawn", "placement", }
+  for _, module in ipairs(required_awful_modules) do
+    if not awful[module] then
+      error("Required awful module '" .. module .. "' is not available")
+    end
+  end
+end
+
 local awesome_interface = {}
 
 ---Get complete screen context information
@@ -38,10 +53,7 @@ end
 ---Internal helper to get focused screen
 ---@return table|nil screen Focused screen or nil if not available
 function awesome_interface._get_focused_screen()
-  if awful and awful.screen and awful.screen.focused then
-    return awful.screen.focused()
-  end
-  return nil
+  return awful.screen.focused()
 end
 
 ---Internal helper to get current tag index from screen
@@ -101,13 +113,8 @@ function awesome_interface.create_named_tag(name, screen)
   end
 
   -- Create tag using AwesomeWM API
-  if awful and awful.tag and awful.tag.add then
-    local new_tag = awful.tag.add(name, { screen = target_screen })
-    return new_tag
-  end
-
-  -- Fallback for testing when awful.tag.add is not available
-  return nil
+  local new_tag = awful.tag.add(name, { screen = target_screen })
+  return new_tag
 end
 
 ---Get all clients from AwesomeWM
@@ -155,24 +162,17 @@ end
 ---@return number|string pid Process ID or error string
 ---@return string|nil snid Spawn notification ID
 function awesome_interface.spawn(command, properties)
-  if awful and awful.spawn then
-    return awful.spawn(command, properties)
-  end
-  return "awful.spawn not available"
+  return awful.spawn(command, properties)
 end
 
 ---Get placement function from awful.placement
 ---@param placement_name string Name of placement function
 ---@return function|nil placement Placement function or nil
 function awesome_interface.get_placement(placement_name)
-  if awful and awful.placement and awful.placement[placement_name] then
+  if awful.placement and awful.placement[placement_name] then
     return awful.placement[placement_name]
   end
   return nil
 end
-
----Access to awesome_client_manager for tag resolution (temporary)
----This will be removed in Phase 5 when tag resolution is extracted
-awesome_interface.awesome_client_manager = nil -- Will be set at runtime
 
 return awesome_interface

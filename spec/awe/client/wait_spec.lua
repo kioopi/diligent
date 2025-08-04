@@ -4,6 +4,14 @@ describe("awe.client.wait", function()
   local awe
   local wait
 
+  setup(function()
+    _G._TEST = true
+  end)
+
+  teardown(function()
+    _G._TEST = nil
+  end)
+
   before_each(function()
     -- Use clean dependency injection
     awe = require("awe")

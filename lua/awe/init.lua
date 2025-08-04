@@ -6,14 +6,14 @@ Provides instance-based dependency injection for clean testing and dry-run suppo
 
 Usage:
   local awe = require("awe")
-  
+
   -- Default instance with awesome_interface
   awe.client.tracker.find_by_pid(1234)
-  
+
   -- Create test instance with mock interface
   local test_awe = awe.create(awe.interfaces.mock_interface)
   test_awe.client.tracker.find_by_pid(1234)
-  
+
   -- Create dry-run instance
   local dry_awe = awe.create(awe.interfaces.dry_run_interface)
 --]]
@@ -22,12 +22,14 @@ local interfaces = require("awe.interfaces")
 local create_client = require("awe.client")
 local create_spawn = require("awe.spawn")
 local create_error = require("awe.error")
+local create_tag = require("awe.tag")
 
 local awe = {
   -- Default instance with awesome_interface
   client = create_client(interfaces.awesome_interface),
   spawn = create_spawn(interfaces.awesome_interface),
   error = create_error.create(interfaces.awesome_interface),
+  tag = create_tag(interfaces.awesome_interface),
 
   -- Direct access to interfaces
   interfaces = interfaces,
@@ -48,6 +50,7 @@ function awe.create(interface)
     client = create_client(interface),
     spawn = create_spawn(interface),
     error = create_error.create(interface),
+    tag = create_tag(interface),
     interfaces = interfaces,
   }
 end

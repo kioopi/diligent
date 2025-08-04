@@ -5,11 +5,20 @@ Tests spawn property building and configuration validation.
 --]]
 
 local assert = require("luassert")
-local awe = require("awe")
 
 describe("awe.spawn.configuration", function()
+  local awe
   local mock_interface
   local configuration
+
+  setup(function()
+    _G._TEST = true
+    awe = require("awe")
+  end)
+
+  teardown(function()
+    _G._TEST = nil
+  end)
 
   before_each(function()
     mock_interface = awe.interfaces.mock_interface

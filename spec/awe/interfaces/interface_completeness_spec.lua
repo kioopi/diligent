@@ -9,15 +9,21 @@ ensuring interface contract consistency across all implementations.
 --]]
 
 local assert = require("luassert")
+local mock_awful = require("spec/awe/interfaces/mock_awful")
 
 describe("Interface Completeness", function()
   local awesome_interface, mock_interface, dry_run_interface
+
+  setup(function() _G._TEST = true end)
+  teardown(function() _G._TEST = nil end)
 
   before_each(function()
     -- Clean module cache to get fresh instances
     package.loaded["awe.interfaces.awesome_interface"] = nil
     package.loaded["awe.interfaces.mock_interface"] = nil
     package.loaded["awe.interfaces.dry_run_interface"] = nil
+
+    mock_awful.setup()
 
     local interfaces = require("awe.interfaces")
     awesome_interface = interfaces.awesome_interface
@@ -63,7 +69,7 @@ describe("Interface Completeness", function()
         "get_placement",
         "get_process_env",
         "get_screen_context",
-        "spawn",
+        "spawn"
       }
 
       for _, func_name in ipairs(expected_core) do
@@ -76,26 +82,22 @@ describe("Interface Completeness", function()
   end)
 
   describe("mock_interface completeness", function()
-    it(
-      "should implement all public functions from awesome_interface",
-      function()
-        local awesome_functions = get_public_functions(awesome_interface)
-        local missing_functions = {}
+    it("should implement all public functions from awesome_interface", function()
+      local awesome_functions = get_public_functions(awesome_interface)
+      local missing_functions = {}
 
-        for _, func_name in ipairs(awesome_functions) do
-          if not function_exists(mock_interface, func_name) then
-            table.insert(missing_functions, func_name)
-          end
+      for _, func_name in ipairs(awesome_functions) do
+        if not function_exists(mock_interface, func_name) then
+          table.insert(missing_functions, func_name)
         end
-
-        assert.are.same(
-          {},
-          missing_functions,
-          "mock_interface is missing these functions: "
-            .. table.concat(missing_functions, ", ")
-        )
       end
-    )
+
+      assert.are.same(
+        {},
+        missing_functions,
+        "mock_interface is missing these functions: " .. table.concat(missing_functions, ", ")
+      )
+    end)
 
     it("should have callable implementations for all functions", function()
       local awesome_functions = get_public_functions(awesome_interface)
@@ -110,26 +112,22 @@ describe("Interface Completeness", function()
   end)
 
   describe("dry_run_interface completeness", function()
-    it(
-      "should implement all public functions from awesome_interface",
-      function()
-        local awesome_functions = get_public_functions(awesome_interface)
-        local missing_functions = {}
+    it("should implement all public functions from awesome_interface", function()
+      local awesome_functions = get_public_functions(awesome_interface)
+      local missing_functions = {}
 
-        for _, func_name in ipairs(awesome_functions) do
-          if not function_exists(dry_run_interface, func_name) then
-            table.insert(missing_functions, func_name)
-          end
+      for _, func_name in ipairs(awesome_functions) do
+        if not function_exists(dry_run_interface, func_name) then
+          table.insert(missing_functions, func_name)
         end
-
-        assert.are.same(
-          {},
-          missing_functions,
-          "dry_run_interface is missing these functions: "
-            .. table.concat(missing_functions, ", ")
-        )
       end
-    )
+
+      assert.are.same(
+        {},
+        missing_functions,
+        "dry_run_interface is missing these functions: " .. table.concat(missing_functions, ", ")
+      )
+    end)
 
     it("should have callable implementations for all functions", function()
       local awesome_functions = get_public_functions(awesome_interface)
@@ -144,92 +142,48 @@ describe("Interface Completeness", function()
   end)
 
   describe("interface contract validation", function()
-    it(
-      "should have consistent function signatures across interfaces",
-      function()
-        -- Test a few key functions to ensure they accept the same parameters
-        -- without error (basic signature compatibility)
+    it("should have consistent function signatures across interfaces", function()
+      -- Test a few key functions to ensure they accept the same parameters
+      -- without error (basic signature compatibility)
 
-        -- get_screen_context - should accept nil or table
-        -- Note: awesome_interface requires AwesomeWM environment, so we test mock/dry_run
-        assert.has_no.errors(function()
-          mock_interface.get_screen_context(nil)
-          dry_run_interface.get_screen_context(nil)
-        end)
+      -- get_screen_context - should accept nil or table
+      assert.has_no.errors(function()
+        awesome_interface.get_screen_context(nil)
+        mock_interface.get_screen_context(nil)
+        dry_run_interface.get_screen_context(nil)
+      end)
 
-        -- For awesome_interface, test with mock screen object to avoid AwesomeWM dependency
-        assert.has_no.errors(function()
-          local mock_screen = {
-            selected_tag = { index = 1 },
-            tags = {},
-          }
-          awesome_interface.get_screen_context(mock_screen)
-        end)
+      -- find_tag_by_name - should accept string and optional screen
+      assert.has_no.errors(function()
+        awesome_interface.find_tag_by_name("test", nil)
+        mock_interface.find_tag_by_name("test", nil)
+        dry_run_interface.find_tag_by_name("test", nil)
+      end)
 
-        -- find_tag_by_name - should accept string and optional screen
-        assert.has_no.errors(function()
-          mock_interface.find_tag_by_name("test", nil)
-          dry_run_interface.find_tag_by_name("test", nil)
-        end)
+      -- create_named_tag - should accept string and optional screen
+      assert.has_no.errors(function()
+        awesome_interface.create_named_tag("test-tag", nil)
+        mock_interface.create_named_tag("test-tag", nil)
+        dry_run_interface.create_named_tag("test-tag", nil)
+      end)
+    end)
 
-        -- create_named_tag - should accept string and optional screen
-        assert.has_no.errors(function()
-          mock_interface.create_named_tag("test-tag", nil)
-          dry_run_interface.create_named_tag("test-tag", nil)
-        end)
+    it("should handle invalid inputs gracefully across all interfaces", function()
+      local interfaces = {
+        awesome = awesome_interface,
+        mock = mock_interface,
+        dry_run = dry_run_interface
+      }
 
-        -- For awesome_interface, test with mock screen to avoid AwesomeWM dependency
+      for interface_name, interface in pairs(interfaces) do
+        -- All interfaces should handle nil/empty inputs without crashing
         assert.has_no.errors(function()
-          local mock_screen = { tags = {} }
-          awesome_interface.find_tag_by_name("test", mock_screen)
-          awesome_interface.create_named_tag("test-tag", mock_screen)
-        end)
+          interface.find_tag_by_name(nil)
+          interface.find_tag_by_name("")
+          interface.create_named_tag(nil)
+          interface.create_named_tag("")
+        end, interface_name .. " should handle invalid inputs gracefully")
       end
-    )
-
-    it(
-      "should handle invalid inputs gracefully across all interfaces",
-      function()
-        local interfaces = {
-          awesome = awesome_interface,
-          mock = mock_interface,
-          dry_run = dry_run_interface,
-        }
-
-        for interface_name, interface in pairs(interfaces) do
-          -- All interfaces should handle nil/empty inputs without crashing
-          assert.has_no.errors(function()
-            interface.find_tag_by_name(nil)
-            interface.find_tag_by_name("")
-            interface.create_named_tag(nil)
-            interface.create_named_tag("")
-          end, interface_name .. " should handle invalid inputs gracefully")
-        end
-      end
-    )
-  end)
-
-  describe("function discovery reporting", function()
-    it("should report current interface state for debugging", function()
-      local awesome_functions = get_public_functions(awesome_interface)
-      local mock_functions = get_public_functions(mock_interface)
-      local dry_run_functions = get_public_functions(dry_run_interface)
-
-      -- This test serves as documentation of current state
-      print("\n=== Interface Function Analysis ===")
-      print(
-        "awesome_interface functions: " .. table.concat(awesome_functions, ", ")
-      )
-      print("mock_interface functions: " .. table.concat(mock_functions, ", "))
-      print(
-        "dry_run_interface functions: " .. table.concat(dry_run_functions, ", ")
-      )
-
-      -- Ensure awesome_interface has reasonable number of functions
-      assert.is_true(
-        #awesome_functions >= 5,
-        "awesome_interface should have at least 5 public functions"
-      )
     end)
   end)
 end)

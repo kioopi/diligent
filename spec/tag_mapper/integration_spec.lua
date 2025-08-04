@@ -6,6 +6,9 @@ describe("tag_mapper.integration", function()
   local awesome_interface
   local dry_run_interface
 
+  setup(function() _G._TEST = true end)
+  teardown(function() _G._TEST = nil end)
+
   before_each(function()
     -- Clean module cache
     package.loaded["tag_mapper.integration"] = nil

@@ -4,6 +4,14 @@ describe("awe.client.properties", function()
   local awe
   local properties
 
+  setup(function()
+    _G._TEST = true
+  end)
+
+  teardown(function()
+    _G._TEST = nil
+  end)
+
   before_each(function()
     -- Use clean dependency injection - no package.loaded hacking needed!
     awe = require("awe")

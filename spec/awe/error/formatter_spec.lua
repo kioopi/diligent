@@ -3,6 +3,9 @@ local assert = require("luassert")
 describe("awe.error.formatter", function()
   local formatter_factory, formatter
 
+  setup(function() _G._TEST = true end)
+  teardown(function() _G._TEST = nil end)
+
   before_each(function()
     -- Clear module cache
     package.loaded["awe.error.formatter"] = nil

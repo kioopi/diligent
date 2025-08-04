@@ -5,11 +5,20 @@ Tests the core application spawning logic.
 --]]
 
 local assert = require("luassert")
-local awe = require("awe")
 
 describe("awe.spawn.spawner", function()
+  local awe
   local mock_interface
   local spawner
+
+  setup(function()
+    _G._TEST = true
+    awe = require("awe")
+  end)
+
+  teardown(function()
+    _G._TEST = nil
+  end)
 
   before_each(function()
     mock_interface = awe.interfaces.mock_interface
@@ -47,27 +56,11 @@ describe("awe.spawn.spawner", function()
   end)
 
   describe("spawn_with_properties", function()
-    local mock_awesome_client_manager
-
-    before_each(function()
-      -- Mock awesome_client_manager functions that spawner depends on
-      mock_awesome_client_manager = {
-        resolve_tag_spec = function(tag_spec)
-          if tag_spec == "invalid" then
-            return nil, "Invalid tag"
-          else
-            return { name = "test", index = 1 }, "Resolved successfully"
-          end
-        end,
-      }
-
-      -- Inject mock into interface for spawner to use
-      mock_interface.awesome_client_manager = mock_awesome_client_manager
-    end)
 
     it("should handle tag resolution failure", function()
+      -- Use nil tag_spec to trigger validation error in tag_mapper.resolve_tag
       local pid, snid, msg =
-        spawner.spawn_with_properties("firefox", "invalid", {})
+        spawner.spawn_with_properties("firefox", nil, {})
 
       assert.is_nil(pid)
       assert.is_nil(snid)
@@ -155,8 +148,8 @@ describe("awe.spawn.spawner", function()
       assert.is_truthy(msg:match("SUCCESS"))
       assert.is_truthy(msg:match("gedit"))
       assert.is_truthy(msg:match("5678"))
-      assert.is_truthy(msg:match("test")) -- tag name
-      assert.is_truthy(msg:match("%[1%]")) -- tag index
+      assert.is_truthy(msg:match("work")) -- tag name
+      assert.is_truthy(msg:match("%[2%]")) -- tag index (mock_interface.create_named_tag returns index 2)
     end)
 
     it("should handle complex configuration", function()

@@ -5,11 +5,20 @@ Tests the factory pattern for spawn modules with dependency injection.
 --]]
 
 local assert = require("luassert")
-local awe = require("awe")
 
 describe("awe.spawn factory", function()
+  local awe
   local mock_interface
   local create_spawn
+
+  setup(function()
+    _G._TEST = true
+    awe = require("awe")
+  end)
+
+  teardown(function()
+    _G._TEST = nil
+  end)
 
   before_each(function()
     mock_interface = awe.interfaces.mock_interface

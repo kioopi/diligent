@@ -3,6 +3,9 @@ local assert = require("luassert")
 describe("tag_mapper.interfaces.dry_run_interface", function()
   local dry_run_interface
 
+  setup(function() _G._TEST = true end)
+  teardown(function() _G._TEST = nil end)
+
   before_each(function()
     -- Clean module cache to get fresh instance
     package.loaded["awe.interfaces.dry_run_interface"] = nil

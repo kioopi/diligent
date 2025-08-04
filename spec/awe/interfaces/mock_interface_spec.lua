@@ -3,6 +3,8 @@ local assert = require("luassert")
 describe("awe.interfaces.mock_interface", function()
   local mock_interface
 
+  setup(function() _G._TEST = true end)
+  teardown(function() _G._TEST = nil end)
   before_each(function()
     -- Clean module cache to get fresh instance
     package.loaded["awe.interfaces.mock_interface"] = nil

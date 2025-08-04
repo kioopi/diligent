@@ -5,11 +5,20 @@ Tests environment variable handling for application spawning.
 --]]
 
 local assert = require("luassert")
-local awe = require("awe")
 
 describe("awe.spawn.environment", function()
+  local awe
   local mock_interface
   local environment
+
+  setup(function()
+    _G._TEST = true
+    awe = require("awe")
+  end)
+
+  teardown(function()
+    _G._TEST = nil
+  end)
 
   before_each(function()
     mock_interface = awe.interfaces.mock_interface

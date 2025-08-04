@@ -10,17 +10,20 @@ local tag_mapper = {}
 
 -- Load new architecture modules
 local tag_mapper_core = require("tag_mapper.core")
-local awesome_interface = require("awe").interfaces.awesome_interface
 local integration = require("tag_mapper.integration")
 
 -- Get the current selected tag index
-function tag_mapper.get_current_tag()
+function tag_mapper.get_current_tag(interface)
+  if not interface then
+    error("interface is required")
+  end
+
   local success, screen_context = pcall(function()
-    return awesome_interface.get_screen_context()
+    return interface.get_screen_context()
   end)
 
   if success then
-    return screen_context.current_tag_index
+    return screen_context.current_tag_index or 1
   else
     -- Fallback to tag 1 if we can't determine current tag (maintains backward compatibility)
     return 1
@@ -28,7 +31,7 @@ function tag_mapper.get_current_tag()
 end
 
 -- Resolve tag specification to actual tag object
-function tag_mapper.resolve_tag(tag_spec, base_tag)
+function tag_mapper.resolve_tag(tag_spec, base_tag, interface)
   -- Input validation (maintain exact same error handling)
   if tag_spec == nil then
     return false, "tag spec is required"
@@ -42,8 +45,12 @@ function tag_mapper.resolve_tag(tag_spec, base_tag)
     return false, "base tag must be a number"
   end
 
+  if interface == nil then
+    return false, "interface is required"
+  end
+
   -- Use new architecture for the actual resolution
-  local screen_context = awesome_interface.get_screen_context()
+  local screen_context = interface.get_screen_context()
 
   local success, resolution = pcall(function()
     return tag_mapper_core.resolve_tag_specification(
@@ -61,7 +68,7 @@ function tag_mapper.resolve_tag(tag_spec, base_tag)
   if resolution.type == "named" then
     if resolution.needs_creation then
       -- Create the named tag
-      local created_tag = awesome_interface.create_named_tag(resolution.name)
+      local created_tag = interface.create_named_tag(resolution.name)
       if created_tag then
         return true, created_tag
       else
@@ -69,7 +76,7 @@ function tag_mapper.resolve_tag(tag_spec, base_tag)
       end
     else
       -- Find existing named tag
-      local existing_tag = awesome_interface.find_tag_by_name(resolution.name)
+      local existing_tag = interface.find_tag_by_name(resolution.name)
       if existing_tag then
         return true, existing_tag
       else
@@ -93,7 +100,7 @@ function tag_mapper.resolve_tag(tag_spec, base_tag)
 end
 
 -- Create or find project tag
-function tag_mapper.create_project_tag(project_name)
+function tag_mapper.create_project_tag(project_name, interface)
   -- Input validation (maintain exact same error handling)
   if not project_name then
     return false, "project name is required"
@@ -107,14 +114,18 @@ function tag_mapper.create_project_tag(project_name)
     return false, "project name must be a string"
   end
 
+  if interface == nil then
+    return false, "interface is required"
+  end
+
   -- Try to find existing project tag first
-  local existing_tag = awesome_interface.find_tag_by_name(project_name)
+  local existing_tag = interface.find_tag_by_name(project_name)
   if existing_tag then
     return true, existing_tag
   end
 
   -- Create new project tag
-  local new_tag = awesome_interface.create_named_tag(project_name)
+  local new_tag = interface.create_named_tag(project_name)
   if new_tag then
     return true, new_tag
   end
@@ -132,24 +143,28 @@ end
 ---Resolve tags for project with interface selection
 ---@param resources table List of resource objects with id and tag fields
 ---@param base_tag number Current base tag index for relative calculations
----@param interface table|nil Optional interface (defaults to awesome_interface)
+---@param interface table Interface implementation (required)
 ---@return table results Complete workflow results
 function tag_mapper.resolve_tags_for_project(resources, base_tag, interface)
-  local selected_interface = interface or awesome_interface
+  if interface == nil then
+    error("interface is required")
+  end
   return integration.resolve_tags_for_project(
     resources,
     base_tag,
-    selected_interface
+    interface
   )
 end
 
 ---Execute tag plan with interface selection
 ---@param plan table Tag operation plan
----@param interface table|nil Optional interface (defaults to awesome_interface)
+---@param interface table Interface implementation (required)
 ---@return table results Execution results
 function tag_mapper.execute_tag_plan(plan, interface)
-  local selected_interface = interface or awesome_interface
-  return integration.execute_tag_plan(plan, selected_interface)
+  if interface == nil then
+    error("interface is required")
+  end
+  return integration.execute_tag_plan(plan, interface)
 end
 
 return tag_mapper

@@ -3,6 +3,9 @@ local assert = require("luassert")
 describe("awe.error.reporter", function()
   local reporter_factory, reporter
 
+  setup(function() _G._TEST = true end)
+  teardown(function() _G._TEST = nil end)
+
   before_each(function()
     -- Clear module cache
     package.loaded["awe.error.reporter"] = nil

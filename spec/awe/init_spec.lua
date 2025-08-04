@@ -3,6 +3,14 @@ local assert = require("luassert")
 describe("awe module", function()
   local awe
 
+  setup(function()
+    _G._TEST = true
+  end)
+
+  teardown(function()
+    _G._TEST = nil
+  end)
+
   before_each(function()
     -- Clean module cache to get fresh instance
     package.loaded["awe"] = nil

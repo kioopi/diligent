@@ -5,10 +5,12 @@ Provides same API as awesome_interface but returns predictable mock data
 for testing purposes. All operations are simulated and deterministic.
 --]]
 
+T = require 'pl.tablex'
+
 local mock_interface = {}
 
 -- Mock data storage
-local mock_data = {
+local initial_mock_data = {
   clients = {},
   process_envs = {},
   spawn_config = {
@@ -28,15 +30,7 @@ local mock_data = {
     end,
   },
   last_spawn_call = nil,
-}
-
----Get mock screen context information
----Returns consistent mock data for testing
----@param screen table|nil Optional screen object (ignored, uses mock data)
----@return table context Mock screen context
-function mock_interface.get_screen_context(screen)
-  -- Return consistent mock data for testing
-  return {
+  screen_context = {
     screen = { index = 1, name = "mock_screen" },
     current_tag_index = 1,
     available_tags = {
@@ -46,6 +40,24 @@ function mock_interface.get_screen_context(screen)
     },
     tag_count = 3,
   }
+}
+
+local mock_data
+
+
+---Get mock screen context information
+---Returns consistent mock data for testing
+---@param screen table|nil Optional screen object (ignored, uses mock data)
+---@return table context Mock screen context
+function mock_interface.get_screen_context(screen)
+  local screen_context = mock_data.screen_context
+
+  if screen_context == 'mock-failing-screen' then
+    error("no screen available - awful.screen.focused() returned nil")
+  end
+
+  -- Return consistent mock data for testing
+  return mock_data.screen_context
 end
 
 ---Find tag by name (mock)
@@ -90,25 +102,7 @@ end
 ---Reset mock data to clean state
 ---Used for test setup
 function mock_interface.reset()
-  mock_data.clients = {}
-  mock_data.process_envs = {}
-  mock_data.spawn_config = {
-    success = true,
-    pid = 1234,
-    snid = "mock-snid",
-  }
-  mock_data.placement_functions = {
-    centered = function()
-      return "mock_centered_placement"
-    end,
-    top_left = function()
-      return "mock_top_left_placement"
-    end,
-    bottom_right = function()
-      return "mock_bottom_right_placement"
-    end,
-  }
-  mock_data.last_spawn_call = nil
+  mock_data = T.deepcopy(initial_mock_data)
 end
 
 ---Set mock clients for testing
@@ -186,5 +180,21 @@ end
 function mock_interface.get_last_spawn_call()
   return mock_data.last_spawn_call
 end
+
+--- Set the current tag index in the mock screen context
+--- @param index number Index to set as current tag index
+function mock_interface.set_current_tag_index(index)
+  if type(mock_data.screen_context) == 'string' then
+  end
+  mock_data.screen_context.current_tag_index = index
+end
+
+--Set the screen context for testing
+---@return table|nil spawn_call Table, or nil to set up a failing screen context
+function mock_interface.set_screen_context(screen_context)
+  mock_data.screen_context = screen_context or 'mock-failing-screen'
+end
+
+mock_interface.reset()
 
 return mock_interface

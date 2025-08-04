@@ -3,6 +3,9 @@ local assert = require("luassert")
 describe("awe.error interface integration", function()
   local awe
 
+  setup(function() _G._TEST = true end)
+  teardown(function() _G._TEST = nil end)
+
   before_each(function()
     -- Clear module cache
     package.loaded["awe"] = nil

@@ -25,24 +25,13 @@ local function create_spawner(interface)
       config = {}
     end
 
-    -- Step 1: Resolve tag
-    -- For now, we'll use the awesome_client_manager's resolve_tag_spec
-    -- This will be moved to a proper tag resolver in Phase 5
-    local target_tag, resolve_msg
-    if
-      interface.awesome_client_manager
-      and interface.awesome_client_manager.resolve_tag_spec
-    then
-      target_tag, resolve_msg =
-        interface.awesome_client_manager.resolve_tag_spec(tag_spec)
-    else
-      -- For mock/test interfaces, provide a simple fallback
-      target_tag = { name = "test", index = 1 }
-      resolve_msg = "Mock tag resolved"
-    end
+    -- Step 1: Resolve tag using new awe.tag.resolver
+    local create_tag_modules = require("awe.tag")
+    local tag_modules = create_tag_modules(interface)
+    local success, target_tag = tag_modules.resolver.resolve_tag_spec(tag_spec)
 
-    if not target_tag then
-      return nil, nil, "Tag resolution failed: " .. resolve_msg
+    if not success then
+      return nil, nil, "Tag resolution failed: " .. target_tag
     end
 
     -- Step 2: Build properties using configuration module

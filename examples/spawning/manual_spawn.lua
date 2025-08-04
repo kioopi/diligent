@@ -169,36 +169,46 @@ local function exec_in_awesome(code)
   return success, result
 end
 
--- Initialize client manager module in AwesomeWM
-local function init_client_manager()
+-- Initialize awe module in AwesomeWM
+local function init_awe_module()
   local success, result = exec_in_awesome([[
-    -- Load the awesome_client_manager module
-    local success, acm = pcall(require, "awesome_client_manager")
+    -- Clear all awe-related modules from cache to ensure fresh load from local path
+    for k, v in pairs(package.loaded) do
+      if k:match("^awe") then
+        package.loaded[k] = nil
+      end
+    end
+    
+    -- Set package path to prioritize local project version
+    package.path = "/home/vt/projects/diligent/lua/?.lua;" .. package.path
+    
+    -- Load the awe module
+    local success, awe = pcall(require, "awe")
     
     if not success then
-      return "ERROR: Failed to load awesome_client_manager module: " .. tostring(acm)
+      return "ERROR: Failed to load awe module: " .. tostring(awe)
     end
     
     -- Store reference globally for easy access
-    _G.diligent_client_manager = acm
+    _G.diligent_awe = awe
     
-    return "SUCCESS: Client manager module loaded"
+    return "SUCCESS: awe module loaded"
   ]])
 
   return success, result
 end
 
--- Resolve tag spec using client manager module
+-- Resolve tag spec using awe module
 local function resolve_tag_spec(tag_spec)
   local lua_code = string.format(
     [[
-    local acm = _G.diligent_client_manager
-    local tag, msg = acm.resolve_tag_spec("%s")
+    local awe = _G.diligent_awe
+    local success, result = awe.tag.resolver.resolve_tag_spec("%s")
     
-    if tag then
-      return "SUCCESS: " .. msg
+    if success then
+      return "SUCCESS: Resolved to tag '" .. tostring(result.name or "unnamed") .. "' (index: " .. result.index .. ")"
     else
-      return "ERROR: " .. msg
+      return "ERROR: " .. result
     end
   ]],
     tag_spec
@@ -250,11 +260,11 @@ spawn_minimal = function(config)
 
   local spawn_code = string.format(
     [[
-    local acm = _G.diligent_client_manager
+    local awe = _G.diligent_awe
     local json_utils = require("json_utils")
     local success, env_vars_data = json_utils.decode('%s')
     
-    local pid, snid, msg = acm.spawn_with_properties("%s", "%s", {
+    local pid, snid, msg = awe.spawn.spawner.spawn_with_properties("%s", "%s", {
       env_vars = env_vars_data or {}
     })
     
@@ -289,11 +299,11 @@ spawn_quiet = function(config)
 
   local spawn_code = string.format(
     [[
-    local acm = _G.diligent_client_manager
+    local awe = _G.diligent_awe
     local json_utils = require("json_utils")
     local success, env_vars_data = json_utils.decode('%s')
     
-    local pid, snid, msg = acm.spawn_with_properties("%s", "%s", {
+    local pid, snid, msg = awe.spawn.spawner.spawn_with_properties("%s", "%s", {
       env_vars = env_vars_data or {}
     })
     
@@ -344,11 +354,11 @@ spawn_json = function(config)
 
   local spawn_code = string.format(
     [[
-    local acm = _G.diligent_client_manager
+    local awe = _G.diligent_awe
     local json_utils = require("json_utils")
     local success, spawn_config_data = json_utils.decode('%s')
     
-    local pid, snid, msg = acm.spawn_with_properties("%s", "%s", spawn_config_data or {})
+    local pid, snid, msg = awe.spawn.spawner.spawn_with_properties("%s", "%s", spawn_config_data or {})
     
     if pid then
       return json_utils.encode({
@@ -494,11 +504,11 @@ spawn_verbose = function(config)
 
   local spawn_code = string.format(
     [[
-    local acm = _G.diligent_client_manager
+    local awe = _G.diligent_awe
     local json_utils = require("json_utils")
     local success, spawn_config_data = json_utils.decode('%s')
     
-    local pid, snid, msg = acm.spawn_with_properties("%s", "%s", spawn_config_data or {})
+    local pid, snid, msg = awe.spawn.spawner.spawn_with_properties("%s", "%s", spawn_config_data or {})
     
     if pid then
       return "SPAWN_SUCCESS: " .. msg .. ", PID=" .. pid .. ", SNID=" .. (snid or "nil")
@@ -533,8 +543,8 @@ spawn_verbose = function(config)
         for prop_key, prop_value in pairs(config.properties) do
           local prop_code = string.format(
             [[
-            local acm = _G.diligent_client_manager
-            local success, result = acm.set_client_property(%s, "%s", "%s")
+            local awe = _G.diligent_awe
+            local success, result = awe.client.properties.set_client_property(%s, "%s", "%s")
             
             if success then
               return "SUCCESS: " .. result
@@ -629,10 +639,10 @@ local function main()
     os.exit(1)
   end
 
-  -- Initialize client manager module
-  local success, result = init_client_manager()
+  -- Initialize awe module
+  local success, result = init_awe_module()
   if not success or result:match("^ERROR:") then
-    print("✗ Failed to load client manager module:", result)
+    print("✗ Failed to load awe module:", result)
     os.exit(1)
   end
 
