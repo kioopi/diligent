@@ -33,7 +33,7 @@
 +----------------------------------------------------------+
 ```
 
-*Revolutionary modular architecture with D-Bus communication and comprehensive AwesomeWM integration.*
+* modular architecture with D-Bus communication and comprehensive AwesomeWM integration.*
 
 ---
 
@@ -53,7 +53,7 @@
 
 ### 2.2 D-Bus Communication Layer — `dbus_communication.lua`
 
-* **Revolutionary Enhancement:** Replaces shell-based `awesome-client` with direct D-Bus
+* ** Enhancement:** Replaces shell-based `awesome-client` with direct D-Bus
 * **Responsibilities**
   1. *Direct D-Bus calls*: Via LGI (Lua GObject Introspection)
   2. *Type handling*: Automatic type detection and conversion
@@ -71,7 +71,7 @@
   4. *Response formatting*: Standardized success/error responses
 * **Architecture:** Modular with separate handler files, not monolithic
 
-### 2.4 awe Module — Revolutionary AwesomeWM Integration
+### 2.4 awe Module —  AwesomeWM Integration
 
 * **Architecture:** 15+ focused modules with instance-based dependency injection
 * **Factory Pattern:** `awe.create(interface)` enables clean testing and dry-run support
@@ -120,7 +120,7 @@
 
 ### DD‑2 Modular Architecture with Dependency Injection (New)
 
-* **Decision:** Revolutionary modular architecture with factory pattern and DI
+* **Decision:**  modular architecture with factory pattern and DI
 * **Benefits:** Clean testing, multiple interface support, extensible design
 * **Implementation:** 15+ focused modules with `awe.create(interface)` pattern
 * **Impact:** Exemplary architecture that exceeds original scope
@@ -175,7 +175,7 @@
    *Transport:* Direct D-Bus method calls with typed responses
    *Benefits:* Reliable, fast, typed communication
 
-2. **awe Module API** (Revolutionary Enhancement)
+2. **awe Module API** ( Enhancement)
    *Pattern:* `awe.create(interface)` for dependency injection
    *Modules:* client, spawn, error, tag with consistent APIs
    *Testing:* Clean factory pattern enables comprehensive testing
@@ -218,7 +218,7 @@
 
 ### To Current Reality:
 - Direct D-Bus communication layer
-- Revolutionary modular architecture with 15+ modules
+-  modular architecture with 15+ modules
 - Comprehensive DSL system with validation
 - Factory pattern with dependency injection
 - Production-validated spawning system

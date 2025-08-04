@@ -285,7 +285,7 @@ make test 2>/dev/null
 
 ## AwesomeWM Integration with awe Module
 
-The `awe` module provides a comprehensive, modular API for all AwesomeWM interactions. It uses a revolutionary factory pattern with dependency injection that enables clean testing, dry-run support, and flexible configuration.
+The `awe` module provides a comprehensive, modular API for all AwesomeWM interactions. It uses a  factory pattern with dependency injection that enables clean testing, dry-run support, and flexible configuration.
 
 ### Architecture Overview
 
@@ -499,7 +499,7 @@ local success, result = dbus_comm.execute_in_awesome(lua_code)
 
 ### Factory Pattern and Dependency Injection
 
-The awe module's revolutionary architecture enables clean testing and flexible configuration:
+The awe module's  architecture enables clean testing and flexible configuration:
 
 #### Factory Pattern Benefits
 
@@ -668,7 +668,7 @@ diligent/
 
 ### Key Architecture Notes
 
-- **awe module**: Revolutionary modular architecture with dependency injection
+- **awe module**:  modular architecture with dependency injection
 - **Factory Pattern**: Enables clean testing and dry-run support across all modules
 - **Single Entry Point**: `require("awe")` provides access to all submodules without rockspec clutter
 - **643 Tests**: Comprehensive test coverage with clean isolation using factory pattern

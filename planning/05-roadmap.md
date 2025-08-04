@@ -45,7 +45,7 @@ A user can write a **single‑resource DSL file**, run `workon start sample`, an
      - Implemented centralized handler registration system
      - Added robust input validation with detailed error messages
      - Enhanced API with async (`emit_command`) and sync (`dispatch_command`) operations
-   * ✅ **REVOLUTIONARY ENHANCEMENT**: Complete awe module architecture (see details below)
+   * ✅ ** ENHANCEMENT**: Complete awe module architecture (see details below)
    * 🚧 Need to implement `start` command and `diligent::start` handler
 
 2. **Tag mapper (comprehensive)** ✅ **COMPLETED** 
@@ -87,7 +87,7 @@ A user can write a **single‑resource DSL file**, run `workon start sample`, an
   - Pure logic layer for easy testing and extension
   - Interface abstraction enabling dry-run and multi-interface support
   - Production-ready modular design
-- ✅ **REVOLUTIONARY MILESTONE**: Complete awe module architecture (643 total tests)
+- ✅ ** MILESTONE**: Complete awe module architecture (643 total tests)
   - Instance-based dependency injection across 15+ modules
   - Factory pattern enabling clean testing and dry-run support
   - Comprehensive AwesomeWM integration layer
@@ -97,7 +97,7 @@ A user can write a **single‑resource DSL file**, run `workon start sample`, an
 
 ---
 
-## Revolutionary Architecture Enhancement *(Unplanned Achievement)*
+##  Architecture Enhancement *(Unplanned Achievement)*
 
 ### 🏗️ **awe Module: Instance-Based Dependency Injection Architecture**
 
@@ -300,7 +300,7 @@ Phase 5               ⏳⏳
 Phase 6                 ⏳
 ```
 
-*Chart updated: Phase 1 shows major progress with revolutionary architecture. Integration work needed to complete MVP.*
+*Chart updated: Phase 1 shows major progress with  architecture. Integration work needed to complete MVP.*
 
 ---
 
@@ -316,7 +316,7 @@ Phase 6                 ⏳
     - Pure logic functions with comprehensive testing (643 total tests)
     - Dry-run capabilities for safe preview and testing
     - Production-ready foundation for resource helpers
-  - ✅ **REVOLUTIONARY MILESTONE**: Complete awe module architecture
+  - ✅ ** MILESTONE**: Complete awe module architecture
     - Instance-based dependency injection across 15+ modules
     - Factory pattern enabling clean testing and dry-run support
     - 643 comprehensive tests with production validation
@@ -326,7 +326,7 @@ Phase 6                 ⏳
   - ⏳ In-memory state management
 - ⏳ **Phase 2**: Ready to begin once Phase 1 integration complete
 
-**Recent Achievement**: Revolutionary awe module architecture creates exemplary foundation far exceeding original scope.
+**Recent Achievement**:  awe module architecture creates exemplary foundation far exceeding original scope.
 
 **Next Priority**: Complete Phase 1 by integrating DSL `app{}` helper with awe spawning backend, then implement in-memory state management.
 
