@@ -35,23 +35,38 @@ local function time_execution(func)
   return success, result, duration
 end
 
--- Initialize awesome_client_manager
-print("Initializing awesome_client_manager...")
+-- Initialize awe module
+print("Loading awe module...")
 local success, result = exec_in_awesome([[
-  local success, acm = pcall(require, "awesome_client_manager")
-  if not success then
-    return "ERROR: Failed to load awesome_client_manager: " .. tostring(acm)
+  -- Clear all awe-related modules from cache to ensure fresh load from local path
+  for k, v in pairs(package.loaded) do
+    if k:match("^awe") then
+      package.loaded[k] = nil
+    end
   end
-  _G.diligent_client_manager = acm
-  return "SUCCESS: Client manager loaded"
+  
+  -- Set package path to prioritize local project version
+  package.path = "/home/vt/projects/diligent/lua/?.lua;" .. package.path
+  
+  -- Load the awe module
+  local success, awe = pcall(require, "awe")
+  
+  if not success then
+    return "ERROR: Failed to load awe module: " .. tostring(awe)
+  end
+  
+  -- Store reference globally for easy access
+  _G.diligent_awe = awe
+  
+  return "SUCCESS: awe module loaded"
 ]])
 
 if not success or result:match("^ERROR:") then
-  print("✗ Failed to initialize client manager:", result)
+  print("✗ Failed to initialize awe module:", result)
   os.exit(1)
 end
 
-print("✓ Client manager initialized")
+print("✓ awe module initialized")
 print()
 
 -- Test 1: Fast-starting Applications
@@ -66,11 +81,11 @@ for _, app in ipairs(fast_apps) do
   local success, result, duration = time_execution(function()
     return exec_in_awesome(string.format(
       [[
-      local acm = _G.diligent_client_manager
+      local awe = _G.diligent_awe
       local start_time = os.clock()
       
       -- Spawn the application
-      local pid, snid, msg = acm.spawn_simple("%s", "0")
+      local pid, snid, msg = awe.spawn.spawner.spawn_with_properties("%s", "0", {})
       
       if not pid then
         return "SPAWN_FAILED: " .. msg
@@ -82,7 +97,7 @@ for _, app in ipairs(fast_apps) do
       local appearance_time = nil
       
       while (os.clock() - start_time) < timeout do
-        local client = acm.find_by_pid(pid)
+        local client = awe.client.tracker.find_by_pid(pid)
         if client then
           appearance_time = (os.clock() - start_time) * 1000  -- Convert to ms
           client_found = true
@@ -129,11 +144,11 @@ for _, test_case in ipairs(complex_apps) do
 
   local success, result = exec_in_awesome(string.format(
     [[
-    local acm = _G.diligent_client_manager
+    local awe = _G.diligent_awe
     local start_time = os.clock()
     
     -- Spawn the application
-    local pid, snid, msg = acm.spawn_simple("%s", "0")
+    local pid, snid, msg = awe.spawn.spawner.spawn_with_properties("%s", "0", {})
     
     if not pid then
       return "SPAWN_FAILED: " .. msg
@@ -147,7 +162,7 @@ for _, test_case in ipairs(complex_apps) do
     
     while (os.clock() - start_time) < timeout do
       check_count = check_count + 1
-      local client = acm.find_by_pid(pid)
+      local client = awe.client.tracker.find_by_pid(pid)
       if client then
         appearance_time = (os.clock() - start_time) * 1000
         client_found = true
@@ -186,11 +201,11 @@ for _, timeout in ipairs(timeout_values) do
 
   local success, result = exec_in_awesome(string.format(
     [[
-    local acm = _G.diligent_client_manager
+    local awe = _G.diligent_awe
     local start_time = os.clock()
     
     -- Spawn xterm (should be fast)
-    local pid, snid, msg = acm.spawn_simple("xterm", "0")
+    local pid, snid, msg = awe.spawn.spawner.spawn_with_properties("xterm", "0", {})
     
     if not pid then
       return "SPAWN_FAILED: " .. msg
@@ -202,7 +217,7 @@ for _, timeout in ipairs(timeout_values) do
     local appearance_time = nil
     
     while (os.clock() - start_time) < timeout do
-      local client = acm.find_by_pid(pid)
+      local client = awe.client.tracker.find_by_pid(pid)
       if client then
         appearance_time = (os.clock() - start_time) * 1000
         client_found = true
@@ -232,7 +247,7 @@ print()
 print("Test 4: Concurrent Spawns with Timeout Tracking")
 print("-----------------------------------------------")
 local success, result = exec_in_awesome([[
-  local acm = _G.diligent_client_manager
+  local awe = _G.diligent_awe
   local start_time = os.clock()
   
   -- Spawn multiple applications simultaneously
@@ -240,7 +255,7 @@ local success, result = exec_in_awesome([[
   local apps = {"xterm", "xcalc", "xeyes"}
   
   for _, app in ipairs(apps) do
-    local pid, snid, msg = acm.spawn_simple(app, "0")
+    local pid, snid, msg = awe.spawn.spawner.spawn_with_properties(app, "0", {})
     if pid then
       table.insert(spawn_results, {
         app = app,
@@ -265,7 +280,7 @@ local success, result = exec_in_awesome([[
       local check_start = os.clock()
       
       while (os.clock() - check_start) < timeout do
-        local client = acm.find_by_pid(spawn.pid)
+        local client = awe.client.tracker.find_by_pid(spawn.pid)
         if client then
           found_time = (os.clock() - start_time) * 1000
           break
@@ -310,12 +325,12 @@ print()
 print("Test 5: False Timeout Prevention")
 print("--------------------------------")
 local success, result = exec_in_awesome([[
-  local acm = _G.diligent_client_manager
+  local awe = _G.diligent_awe
   
   -- Test with a reliably slow-starting application (sleep command that creates a window)
   -- We'll use a shell command that delays before running xterm
   local start_time = os.clock()
-  local pid, snid, msg = acm.spawn_simple("sh -c 'sleep 2; xterm'", "0")
+  local pid, snid, msg = awe.spawn.spawner.spawn_with_properties("sh -c 'sleep 2; xterm'", "0", {})
   
   if not pid then
     return "SPAWN_FAILED: " .. msg
@@ -328,7 +343,7 @@ local success, result = exec_in_awesome([[
   
   while (os.clock() - start_time) < timeout do
     -- Look for any xterm process (might have different PID due to shell)
-    local clients = acm.find_by_name_or_class("xterm")
+    local clients = awe.client.tracker.find_by_name_or_class("xterm")
     if #clients > 0 then
       -- Find the most recent one (highest PID)
       local newest_client = nil

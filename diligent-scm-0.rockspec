@@ -26,7 +26,7 @@ build = {
       dbus_communication = "lua/dbus_communication.lua",
       ["commands.ping"] = "cli/commands/ping.lua",
       ["tag_mapper"] = "lua/tag_mapper/init.lua",
-      ["awesome_client_manager"] = "lua/awesome_client_manager.lua"
+      ["awe"] = "lua/awe/init.lua"
    },
    install = {
       bin = {

@@ -26,30 +26,44 @@ local function exec_in_awesome(code)
   return success, result
 end
 
--- Initialize awesome_client_manager
-print("Initializing awesome_client_manager...")
+-- Initialize awe module
+print("Loading awe module...")
 local success, result = exec_in_awesome([[
-  local success, acm = pcall(require, "awesome_client_manager")
-  if not success then
-    return "ERROR: Failed to load awesome_client_manager: " .. tostring(acm)
+  -- Clear all awe-related modules from cache to ensure fresh load from local path
+  for k, v in pairs(package.loaded) do
+    if k:match("^awe") then
+      package.loaded[k] = nil
+    end
   end
-  _G.diligent_client_manager = acm
-  return "SUCCESS: Client manager loaded"
+  
+  -- Set package path to prioritize local project version
+  package.path = "/home/vt/projects/diligent/lua/?.lua;" .. package.path
+  
+  -- Load the awe module
+  local success, awe = pcall(require, "awe")
+  if not success then
+    return "ERROR: Failed to load awe module: " .. tostring(awe)
+  end
+  
+  -- Store reference globally for easy access
+  _G.diligent_awe = awe
+  
+  return "SUCCESS: awe module loaded"
 ]])
 
 if not success or result:match("^ERROR:") then
-  print("✗ Failed to initialize client manager:", result)
+  print("✗ Failed to initialize awe module:", result)
   os.exit(1)
 end
 
-print("✓ Client manager initialized")
+print("✓ awe module initialized")
 print()
 
 -- Test 1: Mixed Valid/Invalid Commands
 print("Test 1: Mixed Valid/Invalid Commands")
 print("------------------------------------")
 local success, result = exec_in_awesome([[
-  local acm = _G.diligent_client_manager
+  local awe = _G.diligent_awe
   
   -- Define test project with mix of valid/invalid commands
   local test_apps = {
@@ -67,7 +81,7 @@ local success, result = exec_in_awesome([[
   -- Attempt to spawn each application
   for i, app in ipairs(test_apps) do
     local start_time = os.clock()
-    local pid, snid, msg = acm.spawn_simple(app.name, "0")
+    local pid, snid, msg = awe.spawn.spawner.spawn_with_properties(app.name, "0", {})
     local spawn_time = (os.clock() - start_time) * 1000
     
     local status = "UNKNOWN"
@@ -125,7 +139,7 @@ print()
 print("Test 2: Dependency Chain Simulation")
 print("-----------------------------------")
 local success, result = exec_in_awesome([[
-  local acm = _G.diligent_client_manager
+  local awe = _G.diligent_awe
   
   -- Simulate dependency chain: editor depends on file manager, terminal depends on nothing
   local dependency_chain = {
@@ -171,7 +185,7 @@ local success, result = exec_in_awesome([[
       result.success = false
     else
       -- Attempt spawn
-      local pid, snid, msg = acm.spawn_simple(app.name, "0")
+      local pid, snid, msg = awe.spawn.spawner.spawn_with_properties(app.name, "0", {})
       if pid then
         result.status = "SUCCESS"
         result.success = true
@@ -213,7 +227,7 @@ print()
 print("Test 3: Recovery and Cleanup Strategies")
 print("---------------------------------------")
 local success, result = exec_in_awesome([[
-  local acm = _G.diligent_client_manager
+  local awe = _G.diligent_awe
   
   -- Test recovery strategies for partial failures
   local project_apps = {
@@ -230,7 +244,7 @@ local success, result = exec_in_awesome([[
   
   -- Phase 1: Initial spawn attempts
   for i, app in ipairs(project_apps) do
-    local pid, snid, msg = acm.spawn_simple(app, "0")
+    local pid, snid, msg = awe.spawn.spawner.spawn_with_properties(app, "0", {})
     
     table.insert(spawn_attempts, {
       index = i,
@@ -255,7 +269,7 @@ local success, result = exec_in_awesome([[
     local client_found = false
     
     while (os.clock() - start_time) < timeout do
-      local client = acm.find_by_pid(pid)
+      local client = awe.client.tracker.find_by_pid(pid)
       if client then
         client_found = true
         break
@@ -319,7 +333,7 @@ print()
 print("Test 4: State Consistency Validation")
 print("------------------------------------")
 local success, result = exec_in_awesome([[
-  local acm = _G.diligent_client_manager
+  local awe = _G.diligent_awe
   
   -- Test state consistency after mixed success/failure
   local test_scenario = {
@@ -347,7 +361,7 @@ local success, result = exec_in_awesome([[
   
   -- Execute spawns and track state
   for _, attempt in ipairs(all_attempts) do
-    local pid, snid, msg = acm.spawn_simple(attempt.app, "0")
+    local pid, snid, msg = awe.spawn.spawner.spawn_with_properties(attempt.app, "0", {})
     
     local spawn_record = {
       app = attempt.app,

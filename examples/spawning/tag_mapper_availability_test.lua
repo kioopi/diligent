@@ -104,8 +104,8 @@ print("-----------------------------------------------------")
 local tag_mapper_modules = {
   "tag_mapper.core",
   "tag_mapper.integration",
-  "tag_mapper.interfaces.awesome_interface",
-  "tag_mapper.interfaces.dry_run_interface",
+  "awe.interfaces.awesome_interface",
+  "awe.interfaces.dry_run_interface",
 }
 
 local available_count = 0

@@ -35,23 +35,37 @@ local function time_execution(func)
   return success, result, duration
 end
 
--- Initialize awesome_client_manager
-print("Initializing awesome_client_manager...")
+-- Initialize awe module
+print("Loading awe module...")
 local success, result = exec_in_awesome([[
-  local success, acm = pcall(require, "awesome_client_manager")
-  if not success then
-    return "ERROR: Failed to load awesome_client_manager: " .. tostring(acm)
+  -- Clear all awe-related modules from cache to ensure fresh load from local path
+  for k, v in pairs(package.loaded) do
+    if k:match("^awe") then
+      package.loaded[k] = nil
+    end
   end
-  _G.diligent_client_manager = acm
-  return "SUCCESS: Client manager loaded"
+  
+  -- Set package path to prioritize local project version
+  package.path = "/home/vt/projects/diligent/lua/?.lua;" .. package.path
+  
+  -- Load the awe module
+  local success, awe = pcall(require, "awe")
+  if not success then
+    return "ERROR: Failed to load awe module: " .. tostring(awe)
+  end
+  
+  -- Store reference globally for easy access
+  _G.diligent_awe = awe
+  
+  return "SUCCESS: awe module loaded"
 ]])
 
 if not success or result:match("^ERROR:") then
-  print("✗ Failed to initialize client manager:", result)
+  print("✗ Failed to initialize awe module:", result)
   os.exit(1)
 end
 
-print("✓ Client manager initialized")
+print("✓ awe module initialized")
 print()
 
 -- Test 1: Non-existent Command
@@ -232,24 +246,24 @@ else
 end
 print()
 
--- Test 8: Using awesome_client_manager for Error Detection
-print("Test 8: Client Manager Error Detection")
-print("-------------------------------------")
+-- Test 8: Using awe module for Error Detection
+print("Test 8: awe Module Error Detection")
+print("----------------------------------")
 success, result, duration = time_execution(function()
   return exec_in_awesome([[
-    local acm = _G.diligent_client_manager
-    local pid, snid, msg = acm.spawn_simple("nonexistentapp999", "0")
+    local awe = _G.diligent_awe
+    local pid, snid, msg = awe.spawn.spawner.spawn_with_properties("nonexistentapp999", "0", {})
     
-    return string.format("ACM Result - PID: %s, SNID: %s, Message: %s",
+    return string.format("awe Result - PID: %s, SNID: %s, Message: %s",
       tostring(pid), tostring(snid), msg)
   ]])
 end)
 
 if success then
-  print("✓ Client manager error detection:", result)
+  print("✓ awe module error detection:", result)
   print(string.format("  Execution time: %.2f ms", duration))
 else
-  print("✗ Client manager error detection failed:", result)
+  print("✗ awe module error detection failed:", result)
 end
 print()
 
@@ -334,7 +348,7 @@ print("- Error detection patterns and timing")
 print("- Process cleanup behavior")
 print("- Error message content and structure")
 print("- Resource exhaustion handling")
-print("- Integration with awesome_client_manager")
+print("- Integration with awe module")
 print()
 
 -- Generate summary report
@@ -353,4 +367,4 @@ print("Next Steps:")
 print("1. Analyze error detection speed (should be < 100ms)")
 print("2. Verify no zombie processes from failed spawns")
 print("3. Document error message patterns for user feedback")
-print("4. Update client manager with improved error handling")
+print("4. Update awe module with improved error handling")

@@ -19,12 +19,15 @@ This document provides specific guidelines for Claude Code when working on the D
 - **DRY**: Don't Repeat Yourself - extract common functionality
 - **Well-Architected**: Follow the patterns established in `planning/03-Architecture-overview.md`
 - **Maintainable**: Code should be easy to understand and modify
+- **Consistent APIs**: Follow the patterns established in `docs/coding-guidelines.md`
+- **Quality Testing**: Follow the standards in `docs/testing-guidelines.md`
 
 ### Test Coverage
 - Maintain **≥60% test coverage** (enforced by CI)
 - Strive for **≥80% coverage** on core functionality
 - Test edge cases and error conditions
 - Use descriptive test names that explain behavior
+- **Follow testing anti-pattern guidelines** in `docs/testing-guidelines.md` to avoid runtime interface patching and ensure proper test isolation
 
 ## Mandatory Development Workflow
 
@@ -120,10 +123,14 @@ Refer to `planning/03-Architecture-overview.md` for:
 - Document why each dependency is needed
 
 ### API Design
+- **Follow the established API patterns** documented in `docs/coding-guidelines.md`
+- **Function signatures**: `function module.operation(primary_input, context, options)`
+- **Return patterns**: `return success, result, metadata`
+- **Input validation**: Always validate inputs with clear error messages
+- **Language Server annotations**: Use Lua LS annotations for type safety
 - Design APIs from the user's perspective first
 - Write tests for the public API before implementation
 - Keep interfaces simple and consistent
-- Use clear, descriptive function names
 
 ## Documentation Standards
 

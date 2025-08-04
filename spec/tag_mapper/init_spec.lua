@@ -1,93 +1,32 @@
 local assert = require("luassert")
 
--- Mock AwesomeWM functions for testing
-local mock_awesome
-
--- Mock tag object
-local function create_mock_tag(name, index, screen)
-  return {
-    name = name,
-    index = index,
-    screen = screen or mock_awesome.screen.focused(),
-  }
-end
-
--- Initialize mock AwesomeWM
-local function init_mock_awesome()
-  mock_awesome = {
-    tags = {},
-    screen = {
-      focused = function()
-        return {
-          selected_tag = {
-            index = 3, -- default to tag 3 for testing
-          },
-          tags = mock_awesome.tags,
-        }
-      end,
-    },
-  }
-end
-
--- Reset mock state before each test
-local function reset_mock_awesome()
-  init_mock_awesome()
-  mock_awesome.tags = {
-    create_mock_tag("1", 1),
-    create_mock_tag("2", 2),
-    create_mock_tag("3", 3),
-    create_mock_tag("4", 4),
-    create_mock_tag("5", 5),
-    create_mock_tag("6", 6),
-    create_mock_tag("7", 7),
-    create_mock_tag("8", 8),
-    create_mock_tag("9", 9),
-  }
-end
+local tag_mapper = require("tag_mapper")
 
 describe("tag_mapper", function()
-  local tag_mapper
+  local mock_interface
+
+  setup(function()
+    _G._TEST = true
+  end)
+  teardown(function()
+    _G._TEST = nil
+  end)
 
   before_each(function()
     -- Clean module cache to get fresh instance
     package.loaded["tag_mapper"] = nil
-    reset_mock_awesome()
 
-    -- Mock AwesomeWM dependencies
-    _G.awesome = mock_awesome
-    _G.awful = {
-      screen = mock_awesome.screen,
-      tag = {
-        find_by_name = function(name, screen)
-          for _, tag in ipairs(screen.tags) do
-            if tag.name == name then
-              return tag
-            end
-          end
-          return nil
-        end,
-        add = function(name, props)
-          local screen = props.screen or mock_awesome.screen.focused()
-          local new_tag = create_mock_tag(name, #screen.tags + 1, screen)
-          table.insert(screen.tags, new_tag)
-          return new_tag
-        end,
-      },
-    }
-
-    tag_mapper = require("tag_mapper")
+    mock_interface = require("awe").interfaces.mock_interface
   end)
 
   after_each(function()
-    -- Clean up globals
-    _G.awesome = nil
-    _G.awful = nil
+    mock_interface.reset()
   end)
 
   describe("resolve_tag", function()
     it("should resolve relative offset 0 to current tag", function()
       -- Current tag is 3 (from mock), offset 0 should return tag 3
-      local success, result = tag_mapper.resolve_tag(0, 3)
+      local success, result = tag_mapper.resolve_tag(0, 3, mock_interface)
 
       assert.is_true(success)
       assert.is_table(result)
@@ -96,7 +35,7 @@ describe("tag_mapper", function()
 
     it("should resolve relative offset 1 to current tag + 1", function()
       -- Current tag is 3, offset 1 should return tag 4
-      local success, result = tag_mapper.resolve_tag(1, 3)
+      local success, result = tag_mapper.resolve_tag(1, 3, mock_interface)
 
       assert.is_true(success)
       assert.is_table(result)
@@ -105,7 +44,7 @@ describe("tag_mapper", function()
 
     it("should resolve relative offset 2 to current tag + 2", function()
       -- Current tag is 3, offset 2 should return tag 5
-      local success, result = tag_mapper.resolve_tag(2, 3)
+      local success, result = tag_mapper.resolve_tag(2, 3, mock_interface)
 
       assert.is_true(success)
       assert.is_table(result)
@@ -114,7 +53,7 @@ describe("tag_mapper", function()
 
     it("should handle overflow by placing on tag 9", function()
       -- Current tag is 8, offset 2 would be 10, should overflow to 9
-      local success, result = tag_mapper.resolve_tag(2, 8)
+      local success, result = tag_mapper.resolve_tag(2, 8, mock_interface)
 
       assert.is_true(success)
       assert.is_table(result)
@@ -122,7 +61,7 @@ describe("tag_mapper", function()
     end)
 
     it("should resolve digit string to absolute numeric tag", function()
-      local success, result = tag_mapper.resolve_tag("5", 3)
+      local success, result = tag_mapper.resolve_tag("5", 3, mock_interface)
 
       assert.is_true(success)
       assert.is_table(result)
@@ -130,7 +69,7 @@ describe("tag_mapper", function()
     end)
 
     it("should resolve digit string with overflow to tag 9", function()
-      local success, result = tag_mapper.resolve_tag("15", 3)
+      local success, result = tag_mapper.resolve_tag("15", 3, mock_interface)
 
       assert.is_true(success)
       assert.is_table(result)
@@ -138,20 +77,17 @@ describe("tag_mapper", function()
     end)
 
     it("should resolve named tag that exists", function()
-      -- Add a named tag to our mock
-      local editor_tag = create_mock_tag("editor", 10)
-      table.insert(mock_awesome.tags, editor_tag)
-
-      local success, result = tag_mapper.resolve_tag("editor", 3)
+      -- Use a tag that exists in mock_interface ("test" has index 2)
+      local success, result = tag_mapper.resolve_tag("test", 3, mock_interface)
 
       assert.is_true(success)
       assert.is_table(result)
-      assert.are.equal("editor", result.name)
-      assert.are.equal(10, result.index)
+      assert.are.equal("test", result.name)
+      assert.are.equal(2, result.index)
     end)
 
     it("should create named tag if it doesn't exist", function()
-      local success, result = tag_mapper.resolve_tag("logs", 3)
+      local success, result = tag_mapper.resolve_tag("logs", 3, mock_interface)
 
       assert.is_true(success)
       assert.is_table(result)
@@ -159,7 +95,7 @@ describe("tag_mapper", function()
     end)
 
     it("should handle negative offsets by using tag 1", function()
-      local success, result = tag_mapper.resolve_tag(-2, 1)
+      local success, result = tag_mapper.resolve_tag(-2, 1, mock_interface)
 
       assert.is_true(success)
       assert.is_table(result)
@@ -167,7 +103,7 @@ describe("tag_mapper", function()
     end)
 
     it("should handle nil tag spec", function()
-      local success, result = tag_mapper.resolve_tag(nil, 3)
+      local success, result = tag_mapper.resolve_tag(nil, 3, mock_interface)
 
       assert.is_false(success)
       assert.is_string(result)
@@ -175,7 +111,7 @@ describe("tag_mapper", function()
     end)
 
     it("should handle invalid base tag", function()
-      local success, result = tag_mapper.resolve_tag(0, nil)
+      local success, result = tag_mapper.resolve_tag(0, nil, mock_interface)
 
       assert.is_false(success)
       assert.is_string(result)
@@ -183,7 +119,8 @@ describe("tag_mapper", function()
     end)
 
     it("should handle invalid base tag type", function()
-      local success, result = tag_mapper.resolve_tag(0, "not a number")
+      local success, result =
+        tag_mapper.resolve_tag(0, "not a number", mock_interface)
 
       assert.is_false(success)
       assert.is_string(result)
@@ -193,7 +130,8 @@ describe("tag_mapper", function()
 
   describe("create_project_tag", function()
     it("should create project tag with given name", function()
-      local success, result = tag_mapper.create_project_tag("test-project")
+      local success, result =
+        tag_mapper.create_project_tag("test-project", mock_interface)
 
       assert.is_true(success)
       assert.is_table(result)
@@ -203,18 +141,18 @@ describe("tag_mapper", function()
     it("should not create duplicate project tag", function()
       -- Create first project tag
       local success1, result1 =
-        tag_mapper.create_project_tag("existing-project")
+        tag_mapper.create_project_tag("existing-project", mock_interface)
       assert.is_true(success1)
 
       -- Try to create same project tag again - should return existing one
       local success2, result2 =
-        tag_mapper.create_project_tag("existing-project")
+        tag_mapper.create_project_tag("existing-project", mock_interface)
       assert.is_true(success2)
       assert.are.equal(result1.name, result2.name)
     end)
 
     it("should handle empty project name", function()
-      local success, result = tag_mapper.create_project_tag("")
+      local success, result = tag_mapper.create_project_tag("", mock_interface)
 
       assert.is_false(success)
       assert.is_string(result)
@@ -222,7 +160,7 @@ describe("tag_mapper", function()
     end)
 
     it("should handle nil project name", function()
-      local success, result = tag_mapper.create_project_tag(nil)
+      local success, result = tag_mapper.create_project_tag(nil, mock_interface)
 
       assert.is_false(success)
       assert.is_string(result)
@@ -230,7 +168,7 @@ describe("tag_mapper", function()
     end)
 
     it("should handle non-string project name", function()
-      local success, result = tag_mapper.create_project_tag(123)
+      local success, result = tag_mapper.create_project_tag(123, mock_interface)
 
       assert.is_false(success)
       assert.is_string(result)
@@ -240,29 +178,25 @@ describe("tag_mapper", function()
 
   describe("get_current_tag", function()
     it("should return current selected tag index", function()
-      local result = tag_mapper.get_current_tag()
+      mock_interface.set_current_tag_index(3)
+      local result = tag_mapper.get_current_tag(mock_interface)
 
-      assert.are.equal(3, result) -- from mock
+      assert.are.equal(3, result) -- from mock_interface.get_screen_context()
     end)
 
     it("should handle missing screen", function()
       -- Mock no focused screen
-      mock_awesome.screen.focused = function()
-        return nil
-      end
+      mock_interface.set_screen_context()
 
-      local result = tag_mapper.get_current_tag()
+      local result = tag_mapper.get_current_tag(mock_interface)
 
       assert.are.equal(1, result) -- fallback to tag 1
     end)
 
     it("should handle missing selected tag", function()
-      -- Mock screen with no selected tag
-      mock_awesome.screen.focused = function()
-        return { selected_tag = nil, tags = mock_awesome.tags }
-      end
+      mock_interface.set_current_tag_index(nil)
 
-      local result = tag_mapper.get_current_tag()
+      local result = tag_mapper.get_current_tag(mock_interface)
 
       assert.are.equal(1, result) -- fallback to tag 1
     end)
@@ -279,7 +213,8 @@ describe("tag_mapper", function()
       }
 
       for _, test_case in ipairs(tag_specs) do
-        local success, result = tag_mapper.resolve_tag(test_case.spec, base_tag)
+        local success, result =
+          tag_mapper.resolve_tag(test_case.spec, base_tag, mock_interface)
 
         assert.is_true(success)
         assert.is_table(result)
@@ -302,8 +237,11 @@ describe("tag_mapper", function()
       }
 
       for _, test_case in ipairs(test_cases) do
-        local success, result =
-          tag_mapper.resolve_tag(test_case.offset, test_case.base)
+        local success, result = tag_mapper.resolve_tag(
+          test_case.offset,
+          test_case.base,
+          mock_interface
+        )
 
         assert.is_true(success)
         assert.is_table(result)

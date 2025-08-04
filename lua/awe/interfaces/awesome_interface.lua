@@ -6,6 +6,22 @@ Centralizes screen, tag, and window management operations to eliminate
 code duplication and improve testability.
 --]]
 
+local awful_available, awful = pcall(require, "awful")
+
+-- selene: allow(global_usage)
+if not _G._TEST then
+  if not awful_available then
+    error("Failed to load awful module: " .. tostring(awful))
+  end
+
+  local required_awful_modules = { "screen", "tag", "spawn", "placement" }
+  for _, module in ipairs(required_awful_modules) do
+    if not awful[module] then
+      error("Required awful module '" .. module .. "' is not available")
+    end
+  end
+end
+
 local awesome_interface = {}
 
 ---Get complete screen context information
@@ -38,10 +54,7 @@ end
 ---Internal helper to get focused screen
 ---@return table|nil screen Focused screen or nil if not available
 function awesome_interface._get_focused_screen()
-  if awful and awful.screen and awful.screen.focused then
-    return awful.screen.focused()
-  end
-  return nil
+  return awful.screen.focused()
 end
 
 ---Internal helper to get current tag index from screen
@@ -101,12 +114,65 @@ function awesome_interface.create_named_tag(name, screen)
   end
 
   -- Create tag using AwesomeWM API
-  if awful and awful.tag and awful.tag.add then
-    local new_tag = awful.tag.add(name, { screen = target_screen })
-    return new_tag
+  local new_tag = awful.tag.add(name, { screen = target_screen })
+  return new_tag
+end
+
+---Get all clients from AwesomeWM
+---@return table clients List of all client objects
+function awesome_interface.get_clients()
+  if client and client.get then
+    return client.get()
+  end
+  return {}
+end
+
+---Read process environment variables
+---@param pid number Process ID
+---@return table|nil env_vars Environment variables or nil if not accessible
+function awesome_interface.get_process_env(pid)
+  local env_file = "/proc/" .. pid .. "/environ"
+  local file = io.open(env_file, "r")
+
+  if not file then
+    return nil
   end
 
-  -- Fallback for testing when awful.tag.add is not available
+  local content = file:read("*all")
+  file:close()
+
+  if not content then
+    return nil
+  end
+
+  -- Parse environment variables (null-separated)
+  local env_vars = {}
+  for var in content:gmatch("([^%z]+)") do
+    local key, value = var:match("^([^=]+)=(.*)$")
+    if key then
+      env_vars[key] = value
+    end
+  end
+
+  return env_vars
+end
+
+---Spawn application using AwesomeWM awful.spawn
+---@param command string Command to execute
+---@param properties table Spawn properties
+---@return number|string pid Process ID or error string
+---@return string|nil snid Spawn notification ID
+function awesome_interface.spawn(command, properties)
+  return awful.spawn(command, properties)
+end
+
+---Get placement function from awful.placement
+---@param placement_name string Name of placement function
+---@return function|nil placement Placement function or nil
+function awesome_interface.get_placement(placement_name)
+  if awful.placement and awful.placement[placement_name] then
+    return awful.placement[placement_name]
+  end
   return nil
 end
 

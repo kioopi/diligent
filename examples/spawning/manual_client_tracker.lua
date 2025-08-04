@@ -82,23 +82,42 @@ if not dbus_comm.check_awesome_available() then
   os.exit(1)
 end
 
--- Setup client manager module in AwesomeWM
-print("Loading client manager module...")
+-- Setup awe module in AwesomeWM
+print("Loading awe module...")
 local success, result = exec_in_awesome([[
-  -- Load the awesome_client_manager module
-  local success, acm = pcall(require, "awesome_client_manager")
+  -- Clear all awe-related modules from cache to ensure fresh load from local path
+  for k, v in pairs(package.loaded) do
+    if k:match("^awe") then
+      package.loaded[k] = nil
+    end
+  end
+  
+  -- Set package path to prioritize local project version
+  package.path = "/home/vt/projects/diligent/lua/?.lua;" .. package.path
+  
+  -- Load the awe module
+  local success, awe = pcall(require, "awe")
   
   if not success then
-    return "ERROR: Failed to load awesome_client_manager module: " .. tostring(acm)
+    return "ERROR: Failed to load awe module: " .. tostring(awe)
   end
   
   -- Store reference globally for easy access
-  _G.diligent_client_manager = acm
+  _G.diligent_awe = awe
   
-  -- Check module status
-  local status = acm.check_status()
+  -- Check module status by counting available functions
+  local function_count = 0
+  for module_name, module in pairs(awe) do
+    if type(module) == "table" then
+      for func_name, func in pairs(module) do
+        if type(func) == "function" or (type(func) == "table" and func.resolve_tag_spec) then
+          function_count = function_count + 1
+        end
+      end
+    end
+  end
   
-  return "✓ Client manager module loaded (functions: " .. status.functions_count .. ")"
+  return "✓ awe module loaded (estimated functions: " .. function_count .. ")"
 ]])
 
 if not success then
@@ -248,8 +267,8 @@ local function main()
 
     local set_code = string.format(
       [[
-      local acm = _G.diligent_client_manager
-      local success, result = acm.set_client_property(%s, "%s", "%s")
+      local awe = _G.diligent_awe
+      local success, result = awe.client.properties.set_client_property(%s, "%s", "%s")
       
       if success then
         return "SUCCESS: " .. result
@@ -297,16 +316,16 @@ local function main()
 
     local lookup_code = string.format(
       [[
-      local acm = _G.diligent_client_manager
-      local client_obj, err = acm.find_by_pid(%s)
+      local awe = _G.diligent_awe
+      local client_obj, err = awe.client.tracker.find_by_pid(%s)
       
       if not client_obj then
         return "ERROR: " .. err
       end
       
-      local client_info = acm.get_client_info(client_obj)
-      local env_data, env_err = acm.read_process_env(client_obj.pid)
-      local prop_data = acm.get_client_properties(client_obj)
+      local client_info = awe.client.info.get_client_info(client_obj)
+      local env_data, env_err = awe.client.info.read_process_env(client_obj.pid)
+      local prop_data = awe.client.properties.get_client_properties(client_obj)
       
       local result = {
         status = "success",
@@ -371,8 +390,8 @@ local function main()
 
     local lookup_code = string.format(
       [[
-      local acm = _G.diligent_client_manager
-      local clients = acm.find_by_env("%s", "%s")
+      local awe = _G.diligent_awe
+      local clients = awe.client.tracker.find_by_env("%s", "%s")
       
       if #clients == 0 then
         return "ERROR: No clients found with %s=%s"
@@ -380,9 +399,9 @@ local function main()
       
       local results = {}
       for _, client_obj in ipairs(clients) do
-        local client_info = acm.get_client_info(client_obj)
-        local env_data, env_err = acm.read_process_env(client_obj.pid)
-        local prop_data = acm.get_client_properties(client_obj)
+        local client_info = awe.client.info.get_client_info(client_obj)
+        local env_data, env_err = awe.client.info.read_process_env(client_obj.pid)
+        local prop_data = awe.client.properties.get_client_properties(client_obj)
         
         table.insert(results, {
           client = client_info,
@@ -455,8 +474,8 @@ local function main()
 
     local lookup_code = string.format(
       [[
-      local acm = _G.diligent_client_manager
-      local clients = acm.find_by_property("%s", "%s")
+      local awe = _G.diligent_awe
+      local clients = awe.client.tracker.find_by_property("%s", "%s")
       
       if #clients == 0 then
         return "ERROR: No clients found with property %s=%s"
@@ -464,9 +483,9 @@ local function main()
       
       local results = {}
       for _, client_obj in ipairs(clients) do
-        local client_info = acm.get_client_info(client_obj)
-        local env_data, env_err = acm.read_process_env(client_obj.pid)
-        local prop_data = acm.get_client_properties(client_obj)
+        local client_info = awe.client.info.get_client_info(client_obj)
+        local env_data, env_err = awe.client.info.read_process_env(client_obj.pid)
+        local prop_data = awe.client.properties.get_client_properties(client_obj)
         
         table.insert(results, {
           client = client_info,
@@ -533,8 +552,8 @@ local function main()
 
     local lookup_code = string.format(
       [[
-      local acm = _G.diligent_client_manager
-      local clients = acm.find_by_name_or_class("%s")
+      local awe = _G.diligent_awe
+      local clients = awe.client.tracker.find_by_name_or_class("%s")
       
       if #clients == 0 then
         return "ERROR: No clients found matching '%s'"
@@ -542,9 +561,9 @@ local function main()
       
       local results = {}
       for _, client_obj in ipairs(clients) do
-        local client_info = acm.get_client_info(client_obj)
-        local env_data, env_err = acm.read_process_env(client_obj.pid)
-        local prop_data = acm.get_client_properties(client_obj)
+        local client_info = awe.client.info.get_client_info(client_obj)
+        local env_data, env_err = awe.client.info.read_process_env(client_obj.pid)
+        local prop_data = awe.client.properties.get_client_properties(client_obj)
         
         table.insert(results, {
           client = client_info,
@@ -608,8 +627,8 @@ local function main()
     print()
 
     local success, result = exec_in_awesome([[
-      local acm = _G.diligent_client_manager
-      local clients = acm.get_all_tracked_clients()
+      local awe = _G.diligent_awe
+      local clients = awe.client.tracker.get_all_tracked_clients()
       
       if #clients == 0 then
         return "ERROR: No tracked clients found"
@@ -617,9 +636,9 @@ local function main()
       
       local results = {}
       for _, client_obj in ipairs(clients) do
-        local client_info = acm.get_client_info(client_obj)
-        local env_data, env_err = acm.read_process_env(client_obj.pid)
-        local prop_data = acm.get_client_properties(client_obj)
+        local client_info = awe.client.info.get_client_info(client_obj)
+        local env_data, env_err = awe.client.info.read_process_env(client_obj.pid)
+        local prop_data = awe.client.properties.get_client_properties(client_obj)
         
         table.insert(results, {
           client = client_info,
