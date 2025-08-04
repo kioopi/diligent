@@ -5,7 +5,7 @@ Provides same API as awesome_interface but returns predictable mock data
 for testing purposes. All operations are simulated and deterministic.
 --]]
 
-T = require 'pl.tablex'
+T = require("pl.tablex")
 
 local mock_interface = {}
 
@@ -39,11 +39,10 @@ local initial_mock_data = {
       { name = "mock", index = 3 },
     },
     tag_count = 3,
-  }
+  },
 }
 
 local mock_data
-
 
 ---Get mock screen context information
 ---Returns consistent mock data for testing
@@ -52,7 +51,7 @@ local mock_data
 function mock_interface.get_screen_context(screen)
   local screen_context = mock_data.screen_context
 
-  if screen_context == 'mock-failing-screen' then
+  if screen_context == "mock-failing-screen" then
     error("no screen available - awful.screen.focused() returned nil")
   end
 
@@ -184,7 +183,7 @@ end
 --- Set the current tag index in the mock screen context
 --- @param index number Index to set as current tag index
 function mock_interface.set_current_tag_index(index)
-  if type(mock_data.screen_context) == 'string' then
+  if type(mock_data.screen_context) == "string" then
   end
   mock_data.screen_context.current_tag_index = index
 end
@@ -192,7 +191,7 @@ end
 --Set the screen context for testing
 ---@return table|nil spawn_call Table, or nil to set up a failing screen context
 function mock_interface.set_screen_context(screen_context)
-  mock_data.screen_context = screen_context or 'mock-failing-screen'
+  mock_data.screen_context = screen_context or "mock-failing-screen"
 end
 
 mock_interface.reset()

@@ -5,8 +5,12 @@ describe("awesome_interface", function()
   local awesome_interface
   local awful
 
-  setup(function() _G._TEST = true end)
-  teardown(function() _G._TEST = nil end)
+  setup(function()
+    _G._TEST = true
+  end)
+  teardown(function()
+    _G._TEST = nil
+  end)
 
   before_each(function()
     -- Clean module cache to get fresh instance
@@ -16,7 +20,9 @@ describe("awesome_interface", function()
     awesome_interface = require("awe").interfaces.awesome_interface
   end)
 
-  after_each(function() mock_awful.cleanup() end)
+  after_each(function()
+    mock_awful.cleanup()
+  end)
 
   describe("get_screen_context", function()
     it("should return complete screen context", function()
@@ -36,7 +42,10 @@ describe("awesome_interface", function()
     it("should handle custom screen parameter", function()
       local custom_screen = {
         selected_tag = { index = 5 },
-        tags = { mock_awful.create_mock_tag("1", 1), mock_awful.create_mock_tag("2", 2) },
+        tags = {
+          mock_awful.create_mock_tag("1", 1),
+          mock_awful.create_mock_tag("2", 2),
+        },
       }
 
       local context = awesome_interface.get_screen_context(custom_screen)

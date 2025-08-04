@@ -6,8 +6,12 @@ describe("awesome_interface", function()
   local awesome_interface
   local awful
 
-  setup(function() _G._TEST = true end)
-  teardown(function() _G._TEST = nil end)
+  setup(function()
+    _G._TEST = true
+  end)
+  teardown(function()
+    _G._TEST = nil
+  end)
   before_each(function()
     -- Clean module cache to get fresh instance
     package.loaded["awe.interfaces.awesome_interface"] = nil
@@ -33,7 +37,10 @@ describe("awesome_interface", function()
     it("should handle custom screen parameter", function()
       local custom_screen = {
         selected_tag = { index = 5 },
-        tags = { mock_awful.create_mock_tag("1", 1), mock_awful.create_mock_tag("2", 2) },
+        tags = {
+          mock_awful.create_mock_tag("1", 1),
+          mock_awful.create_mock_tag("2", 2),
+        },
       }
 
       local context = awesome_interface.get_screen_context(custom_screen)
@@ -124,8 +131,7 @@ describe("awesome_interface", function()
 
   describe("create_named_tag", function()
     -- FIXME: This need to go into the general awful mock
-    before_each(function()
-    end)
+    before_each(function() end)
 
     it("should create new named tag", function()
       local screen = awful.screen.focused()

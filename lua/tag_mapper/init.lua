@@ -149,11 +149,7 @@ function tag_mapper.resolve_tags_for_project(resources, base_tag, interface)
   if interface == nil then
     error("interface is required")
   end
-  return integration.resolve_tags_for_project(
-    resources,
-    base_tag,
-    interface
-  )
+  return integration.resolve_tags_for_project(resources, base_tag, interface)
 end
 
 ---Execute tag plan with interface selection

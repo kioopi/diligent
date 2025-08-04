@@ -5,8 +5,12 @@ local tag_mapper = require("tag_mapper")
 describe("tag_mapper", function()
   local mock_interface
 
-  setup(function() _G._TEST = true end)
-  teardown(function() _G._TEST = nil end)
+  setup(function()
+    _G._TEST = true
+  end)
+  teardown(function()
+    _G._TEST = nil
+  end)
 
   before_each(function()
     -- Clean module cache to get fresh instance
@@ -18,7 +22,6 @@ describe("tag_mapper", function()
   after_each(function()
     mock_interface.reset()
   end)
-
 
   describe("resolve_tag", function()
     it("should resolve relative offset 0 to current tag", function()
@@ -116,7 +119,8 @@ describe("tag_mapper", function()
     end)
 
     it("should handle invalid base tag type", function()
-      local success, result = tag_mapper.resolve_tag(0, "not a number", mock_interface)
+      local success, result =
+        tag_mapper.resolve_tag(0, "not a number", mock_interface)
 
       assert.is_false(success)
       assert.is_string(result)
@@ -126,7 +130,8 @@ describe("tag_mapper", function()
 
   describe("create_project_tag", function()
     it("should create project tag with given name", function()
-      local success, result = tag_mapper.create_project_tag("test-project", mock_interface)
+      local success, result =
+        tag_mapper.create_project_tag("test-project", mock_interface)
 
       assert.is_true(success)
       assert.is_table(result)
@@ -208,7 +213,8 @@ describe("tag_mapper", function()
       }
 
       for _, test_case in ipairs(tag_specs) do
-        local success, result = tag_mapper.resolve_tag(test_case.spec, base_tag, mock_interface)
+        local success, result =
+          tag_mapper.resolve_tag(test_case.spec, base_tag, mock_interface)
 
         assert.is_true(success)
         assert.is_table(result)
@@ -231,8 +237,11 @@ describe("tag_mapper", function()
       }
 
       for _, test_case in ipairs(test_cases) do
-        local success, result =
-          tag_mapper.resolve_tag(test_case.offset, test_case.base, mock_interface)
+        local success, result = tag_mapper.resolve_tag(
+          test_case.offset,
+          test_case.base,
+          mock_interface
+        )
 
         assert.is_true(success)
         assert.is_table(result)

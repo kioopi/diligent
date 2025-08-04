@@ -13,7 +13,7 @@ if not _G._TEST then
     error("Failed to load awful module: " .. tostring(awful))
   end
 
-  local required_awful_modules = { "screen", "tag", "spawn", "placement", }
+  local required_awful_modules = { "screen", "tag", "spawn", "placement" }
   for _, module in ipairs(required_awful_modules) do
     if not awful[module] then
       error("Required awful module '" .. module .. "' is not available")

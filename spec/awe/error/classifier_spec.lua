@@ -3,8 +3,12 @@ local assert = require("luassert")
 describe("awe.error.classifier", function()
   local classifier_factory, classifier
 
-  setup(function() _G._TEST = true end)
-  teardown(function() _G._TEST = nil end)
+  setup(function()
+    _G._TEST = true
+  end)
+  teardown(function()
+    _G._TEST = nil
+  end)
 
   before_each(function()
     -- Clear module cache

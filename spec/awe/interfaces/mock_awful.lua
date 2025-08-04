@@ -1,4 +1,3 @@
-
 local function create_mock_tag(name, index)
   return {
     name = name,
@@ -24,7 +23,7 @@ local create_mock_awful = function()
         }
       end,
     },
-    tag = {}
+    tag = {},
   }
 
   mock_awful.tag.find_by_name = function(name, screen)
@@ -40,14 +39,14 @@ local create_mock_awful = function()
   end
 
   mock_awful.tag.add = function(name, props)
-      if name == "fail-tag-creation" then
-        return nil -- Simulate failure for this specific tag
-      end
+    if name == "fail-tag-creation" then
+      return nil -- Simulate failure for this specific tag
+    end
 
-      local screen = props.screen or mock_awful.screen.focused()
-      local new_tag = create_mock_tag(name, #screen.tags + 1)
-      table.insert(screen.tags, new_tag)
-      return new_tag
+    local screen = props.screen or mock_awful.screen.focused()
+    local new_tag = create_mock_tag(name, #screen.tags + 1)
+    table.insert(screen.tags, new_tag)
+    return new_tag
   end
 
   return mock_awful
@@ -56,10 +55,12 @@ end
 function init()
   local original_awesome
 
-  return  {
+  return {
     setup = function()
       if not _G._TEST then
-        error("_G._TEST is not set. It should be set to true when using mocked awful.")
+        error(
+          "_G._TEST is not set. It should be set to true when using mocked awful."
+        )
       end
 
       local mock_awful = create_mock_awful()

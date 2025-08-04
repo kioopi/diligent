@@ -56,11 +56,9 @@ describe("awe.spawn.spawner", function()
   end)
 
   describe("spawn_with_properties", function()
-
     it("should handle tag resolution failure", function()
       -- Use nil tag_spec to trigger validation error in tag_mapper.resolve_tag
-      local pid, snid, msg =
-        spawner.spawn_with_properties("firefox", nil, {})
+      local pid, snid, msg = spawner.spawn_with_properties("firefox", nil, {})
 
       assert.is_nil(pid)
       assert.is_nil(snid)
