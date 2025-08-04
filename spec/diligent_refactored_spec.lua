@@ -22,6 +22,13 @@ describe("Diligent Refactored Module", function()
     diligent.handlers = {}
   end)
 
+  setup(function()
+    _G._TEST = true
+  end)
+  teardown(function()
+    _G._TEST = nil
+  end)
+
   describe("module structure", function()
     it("should load the main module", function()
       assert.is_table(diligent)
