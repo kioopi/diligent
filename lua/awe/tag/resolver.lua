@@ -39,10 +39,8 @@ local function create_resolver(interface)
     elseif type(tag_spec) == "string" and tag_spec:match("^[-](%d+)$") then
       local offset = tonumber(tag_spec:match("^[-](%d+)$"))
       structured_spec = -offset -- negative relative offset
-    elseif type(tag_spec) == "string" and tag_spec:match("^%d+$") then
-      structured_spec = tag_spec -- absolute string
     else
-      structured_spec = tag_spec -- named tag or other
+      structured_spec = tag_spec -- absolute string, named tag, or other
     end
 
     -- Use tag_mapper for actual resolution (pass interface to avoid circular dependency)

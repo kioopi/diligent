@@ -8,6 +8,7 @@ code duplication and improve testability.
 
 local awful_available, awful = pcall(require, "awful")
 
+-- selene: allow(global_usage)
 if not _G._TEST then
   if not awful_available then
     error("Failed to load awful module: " .. tostring(awful))

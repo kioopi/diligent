@@ -5,7 +5,7 @@ Provides same API as awesome_interface but returns predictable mock data
 for testing purposes. All operations are simulated and deterministic.
 --]]
 
-T = require("pl.tablex")
+local T = require("pl.tablex")
 
 local mock_interface = {}
 
@@ -184,6 +184,7 @@ end
 --- @param index number Index to set as current tag index
 function mock_interface.set_current_tag_index(index)
   if type(mock_data.screen_context) == "string" then
+    return -- Cannot set tag index on string screen context
   end
   mock_data.screen_context.current_tag_index = index
 end
