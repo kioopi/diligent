@@ -424,6 +424,114 @@ function utils.process_with_function(input, processor)
 end
 ```
 
+## Rockspec Organization Patterns
+
+### Single Entry Point Pattern (Recommended)
+
+The project uses a proven single entry point pattern for complex modules that provides clean access to submodules without cluttering the rockspec file.
+
+**Successful Pattern:**
+```lua
+-- In diligent-scm-0.rockspec
+build = {
+  type = "builtin",
+  modules = {
+    -- Single entry point enables all submodule access
+    ["awe"] = "lua/awe/init.lua",
+    ["tag_mapper"] = "lua/tag_mapper/init.lua",
+    -- ... other modules
+  }
+}
+```
+
+**Usage - Clean Submodule Access:**
+```lua
+-- Users can access all submodules through the main entry point
+local awe = require("awe")
+
+-- All submodules available without explicit rockspec registration
+awe.client.tracker.find_by_pid(1234)
+awe.spawn.spawner.spawn_with_properties("firefox", "+1", {})
+awe.error.classifier.classify_error("No such file")
+awe.tag.resolver.resolve_tag_spec("editor")
+```
+
+### Benefits of Single Entry Point
+
+**✅ Advantages:**
+- **Clean Package Management**: Only one entry in rockspec instead of 15+ submodule entries
+- **Discoverable API**: Users can explore `awe.client`, `awe.spawn`, etc. naturally
+- **Flexible Architecture**: Easy to add new submodules without rockspec changes
+- **Consistent Access**: All modules follow the same `require("awe").module.submodule` pattern
+
+**❌ Anti-Pattern to Avoid:**
+```lua
+-- Don't clutter rockspec with every submodule
+build = {
+  modules = {
+    ["awe"] = "lua/awe/init.lua",
+    ["awe.client"] = "lua/awe/client/init.lua",           -- Unnecessary
+    ["awe.client.tracker"] = "lua/awe/client/tracker.lua", -- Clutter
+    ["awe.client.properties"] = "lua/awe/client/properties.lua", -- Verbose
+    ["awe.spawn.spawner"] = "lua/awe/spawn/spawner.lua",  -- Maintenance burden
+    -- ... 15+ more entries that provide no benefit
+  }
+}
+```
+
+### When to Use Each Pattern
+
+**Single Entry Point** - Use when:
+- Module has multiple related submodules (like `awe` with client, spawn, error, tag)
+- Submodules work together as a cohesive system
+- You want clean, discoverable APIs
+- Maintenance burden of individual registration is high
+
+**Individual Registration** - Use when:
+- Modules are completely independent
+- Users typically need only one specific module
+- Module is simple with no submodules
+
+### Implementation Requirements
+
+For single entry point pattern to work, your main module must:
+
+1. **Export all submodules**:
+```lua
+-- In lua/awe/init.lua
+local awe = {
+  client = create_client(interfaces.awesome_interface),
+  spawn = create_spawn(interfaces.awesome_interface),
+  error = create_error.create(interfaces.awesome_interface),
+  tag = create_tag(interfaces.awesome_interface),
+  interfaces = interfaces,
+}
+```
+
+2. **Enable factory pattern for testing**:
+```lua
+function awe.create(interface)
+  return {
+    client = create_client(interface),
+    spawn = create_spawn(interface),
+    error = create_error.create(interface),
+    tag = create_tag(interface),
+  }
+end
+```
+
+3. **Ensure submodules return proper tables**:
+```lua
+-- Each submodule factory returns a table of functions
+local function create_tracker(interface)
+  return {
+    find_by_pid = function(pid) ... end,
+    find_by_name = function(name) ... end,
+    -- ... other functions
+  }
+end
+```
+
 ## Module Structure
 
 ### Interface Modules

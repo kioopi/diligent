@@ -283,24 +283,379 @@ The D-Bus communication layer provides excellent performance:
 make test 2>/dev/null
 ```
 
+## AwesomeWM Integration with awe Module
+
+The `awe` module provides a comprehensive, modular API for all AwesomeWM interactions. It uses a revolutionary factory pattern with dependency injection that enables clean testing, dry-run support, and flexible configuration.
+
+### Architecture Overview
+
+The awe module is organized into focused submodules:
+- **`awe.client`** - Client finding, tracking, properties, and waiting
+- **`awe.spawn`** - Application spawning with configuration and environment handling  
+- **`awe.error`** - Error classification, reporting, and user-friendly formatting
+- **`awe.tag`** - Tag resolution for string-based specifications
+- **`awe.interfaces`** - Interface abstractions (awesome, dry-run, mock)
+
+### Basic Usage Patterns
+
+#### Default Usage (Production)
+```lua
+local awe = require("awe")
+
+-- Client operations
+local client = awe.client.tracker.find_by_pid(1234)
+local properties = awe.client.properties.get_client_properties(client)
+
+-- Spawning applications
+local pid, snid, msg = awe.spawn.spawner.spawn_with_properties("firefox", "+1", {
+  floating = true,
+  placement = "center"
+})
+
+-- Tag resolution
+local success, resolved_tag = awe.tag.resolver.resolve_tag_spec("editor")
+
+-- Error handling
+local error_report = awe.error.classifier.classify_error("No such file or directory")
+local formatted = awe.error.formatter.format_error_for_user(error_report)
+```
+
+#### Testing with Mock Interface
+```lua
+local awe = require("awe")
+
+-- Create test instance with mock interface
+local test_awe = awe.create(awe.interfaces.mock_interface)
+
+-- All operations use mock instead of real AwesomeWM
+local client = test_awe.client.tracker.find_by_pid(1234)  -- Uses mock
+local pid = test_awe.spawn.spawner.spawn_with_properties("test", "0", {})  -- Uses mock
+```
+
+#### Dry-Run Mode
+```lua
+local awe = require("awe")
+
+-- Create dry-run instance that logs operations without executing
+local dry_awe = awe.create(awe.interfaces.dry_run_interface)
+
+-- Operations are logged but don't affect AwesomeWM
+dry_awe.spawn.spawner.spawn_with_properties("firefox", "+1", {})  -- Logged only
+```
+
+### Detailed Module Usage
+
+#### Client Management (`awe.client`)
+
+**Finding Clients:**
+```lua
+local awe = require("awe")
+
+-- Find by process ID
+local client = awe.client.tracker.find_by_pid(1234)
+
+-- Find by environment variable
+local clients = awe.client.tracker.find_by_env("PROJECT_NAME", "myproject")
+
+-- Find by property
+local editor_clients = awe.client.tracker.find_by_property("role", "editor")
+
+-- Find by name or class
+local firefox = awe.client.tracker.find_by_name_or_class("firefox")
+
+-- Get all tracked clients
+local all_clients = awe.client.tracker.get_all_tracked_clients()
+```
+
+**Managing Client Properties:**
+```lua
+-- Get client properties
+local properties = awe.client.properties.get_client_properties(client)
+
+-- Set client property
+local success = awe.client.properties.set_client_property(client, "role", "editor")
+
+-- Get client information
+local info = awe.client.info.get_client_info(client)
+
+-- Read process environment
+local env_vars = awe.client.info.read_process_env(1234)
+```
+
+**Waiting for Clients:**
+```lua
+-- Wait for client to appear and set properties
+local success, client = awe.client.wait.wait_and_set_properties(1234, {
+  role = "editor",
+  floating = true
+}, {timeout = 10})
+```
+
+#### Application Spawning (`awe.spawn`)
+
+**Environment Handling:**
+```lua
+-- Build command with environment variables
+local command = awe.spawn.environment.build_command_with_env("firefox", {
+  DISPLAY = ":0",
+  PROJECT_ROOT = "/home/user/project"
+})
+```
+
+**Spawn Configuration:**
+```lua
+-- Build spawn properties
+local properties = awe.spawn.configuration.build_spawn_properties(resolved_tag, {
+  floating = true,
+  placement = "top_right",
+  width = 800,
+  height = 600
+})
+```
+
+**Core Spawning:**
+```lua
+-- Spawn with full configuration
+local pid, snid, msg = awe.spawn.spawner.spawn_with_properties("firefox", "+2", {
+  floating = true,
+  placement = "center",
+  env_vars = {DISPLAY = ":0"},
+  timeout = 10
+})
+
+-- Simple spawning
+local pid, snid, msg = awe.spawn.spawner.spawn_simple("gedit", "0")
+```
+
+#### Error Handling (`awe.error`)
+
+**Error Classification:**
+```lua
+-- Classify error messages
+local error_report = awe.error.classifier.classify_error("bash: nonexistent: command not found")
+-- Returns: {type = "COMMAND_NOT_FOUND", ...}
+
+-- Get error type constants
+local ERROR_TYPES = awe.error.classifier.ERROR_TYPES
+```
+
+**Error Reporting:**
+```lua
+-- Create comprehensive error report
+local report = awe.error.reporter.create_error_report({
+  {type = "COMMAND_NOT_FOUND", message = "bash: nonexistent: command not found"},
+  {type = "TIMEOUT", message = "Client did not appear within 5 seconds"}
+})
+
+-- Create spawn summary
+local summary = awe.error.reporter.create_spawn_summary(pid, snid, errors, timing)
+
+-- Get actionable suggestions
+local suggestions = awe.error.reporter.get_error_suggestions("COMMAND_NOT_FOUND")
+```
+
+**Error Formatting:**
+```lua
+-- Format errors for user display
+local formatted = awe.error.formatter.format_error_for_user(error_report)
+print(formatted)  -- User-friendly error message with suggestions
+```
+
+#### Tag Resolution (`awe.tag`)
+
+**String-Based Tag Resolution:**
+```lua
+-- Resolve various tag specification formats
+local success, tag = awe.tag.resolver.resolve_tag_spec("0")        -- Current tag
+local success, tag = awe.tag.resolver.resolve_tag_spec("+2")       -- Current + 2
+local success, tag = awe.tag.resolver.resolve_tag_spec("-1")       -- Current - 1
+local success, tag = awe.tag.resolver.resolve_tag_spec("3")        -- Absolute tag 3
+local success, tag = awe.tag.resolver.resolve_tag_spec("editor")   -- Named tag "editor"
+
+-- With options
+local success, tag = awe.tag.resolver.resolve_tag_spec("editor", {
+  create_missing = true,
+  timeout = 5
+})
+```
+
+### Integration with D-Bus Communication
+
+The awe module works seamlessly with the existing D-Bus communication layer:
+
+```lua
+local dbus_comm = require("dbus_communication")
+local awe = require("awe")
+
+-- Execute awe operations in AwesomeWM via D-Bus
+local lua_code = string.format([[
+  local awe = require("awe")
+  local success, tag = awe.tag.resolver.resolve_tag_spec("%s")
+  return success and tag.name or "failed"
+]], tag_spec)
+
+local success, result = dbus_comm.execute_in_awesome(lua_code)
+```
+
+### Factory Pattern and Dependency Injection
+
+The awe module's revolutionary architecture enables clean testing and flexible configuration:
+
+#### Factory Pattern Benefits
+
+1. **Clean Testing**: No hacky `package.loaded` overwriting
+2. **Multiple Instances**: Can have real, mock, and dry-run instances simultaneously  
+3. **Consistent API**: Same pattern across all 15+ modules
+4. **Easy Extension**: Add new modules following the same pattern
+
+#### Creating Custom Interfaces
+
+```lua
+-- Create custom interface for specialized testing
+local custom_interface = {
+  get_clients = function() return custom_client_list end,
+  spawn = function(cmd) return custom_spawn_logic(cmd) end,
+  -- ... other interface methods
+}
+
+-- Use custom interface
+local custom_awe = awe.create(custom_interface)
+```
+
+### Best Practices
+
+#### Use Appropriate Module Level
+```lua
+-- Good: Use specific modules for focused operations
+local clients = awe.client.tracker.find_by_pid(1234)
+local error_type = awe.error.classifier.classify_error(msg)
+
+-- Avoid: Importing entire awe when you need one function
+-- (Though this is acceptable for scripts that use multiple modules)
+```
+
+#### Error Handling
+```lua
+-- Always check success returns
+local success, result, metadata = awe.tag.resolver.resolve_tag_spec("editor")
+if not success then
+  local formatted_error = awe.error.formatter.format_error_for_user({
+    type = "TAG_RESOLUTION_FAILED",
+    message = result,  -- Error message when success=false
+    context = metadata
+  })
+  print(formatted_error)
+  return
+end
+```
+
+#### Testing Pattern
+```lua
+-- In tests, always use factory pattern
+describe("My AwesomeWM Feature", function()
+  local awe
+  
+  before_each(function()
+    awe = require("awe").create(require("awe").interfaces.mock_interface)
+  end)
+  
+  it("should spawn application", function()
+    local pid, snid, msg = awe.spawn.spawner.spawn_simple("test", "0")
+    assert.is_not_nil(pid)
+  end)
+end)
+```
+
+### Extending awe Module
+
+To add new functionality to the awe module:
+
+1. **Create new submodule** following the factory pattern
+2. **Add to main awe/init.lua** 
+3. **Include in factory function**
+4. **Write comprehensive tests**
+5. **Document API patterns**
+
+Example new module structure:
+```lua
+-- lua/awe/newmodule/init.lua
+local function create_newmodule(interface)
+  return {
+    operation1 = function(...) ... end,
+    operation2 = function(...) ... end,
+  }
+end
+
+return create_newmodule
+```
+
 ## Project Structure
 
 ```
 diligent/
 ├── cli/                    # Command-line interface
+│   ├── commands/           # CLI command implementations
 │   └── workon             # Main CLI script
 ├── lua/                   # Core Lua modules
+│   ├── awe/               # AwesomeWM integration layer (modular architecture)
+│   │   ├── init.lua       # Main awe module with factory pattern
+│   │   ├── interfaces/    # Interface abstractions
+│   │   │   ├── init.lua   # Interface factory
+│   │   │   ├── awesome_interface.lua    # Live AwesomeWM interface
+│   │   │   ├── dry_run_interface.lua    # Dry-run interface
+│   │   │   └── mock_interface.lua       # Mock interface for testing
+│   │   ├── client/        # Client management modules
+│   │   │   ├── init.lua   # Client factory with dependency injection
+│   │   │   ├── tracker.lua              # Client finding & tracking
+│   │   │   ├── properties.lua           # Client property management
+│   │   │   ├── info.lua   # Client information retrieval
+│   │   │   └── wait.lua   # Client waiting & polling
+│   │   ├── spawn/         # Application spawning modules
+│   │   │   ├── init.lua   # Spawn factory with dependency injection
+│   │   │   ├── spawner.lua              # Core spawning logic
+│   │   │   ├── configuration.lua        # Spawn configuration building
+│   │   │   └── environment.lua          # Environment variable handling
+│   │   ├── error/         # Error handling framework
+│   │   │   ├── init.lua   # Error factory with dependency injection
+│   │   │   ├── classifier.lua           # Error classification
+│   │   │   ├── reporter.lua             # Error reporting & aggregation
+│   │   │   └── formatter.lua            # User-friendly formatting
+│   │   └── tag/           # Tag operation modules
+│   │       ├── init.lua   # Tag factory with dependency injection
+│   │       └── resolver.lua             # String-based tag resolution wrapper
+│   ├── tag_mapper/        # Pure tag resolution logic
+│   │   ├── init.lua       # Main tag mapper (updated - uses awe interfaces)
+│   │   ├── core.lua       # Core tag resolution algorithms
+│   │   └── integration.lua # AwesomeWM integration utilities
 │   ├── diligent.lua       # AwesomeWM signal handlers
-│   └── dbus_communication.lua # D-Bus communication layer
-├── spec/                  # Test files
-│   ├── *_spec.lua         # Unit tests
+│   ├── dbus_communication.lua # D-Bus communication layer
+│   ├── json_utils.lua     # JSON utilities
+│   └── cli_printer.lua    # CLI output formatting
+├── spec/                  # Test files (643 tests total)
+│   ├── awe/               # awe module comprehensive tests
+│   │   ├── *_spec.lua     # Individual module tests
+│   │   ├── client/        # Client module tests (42 tests)
+│   │   ├── spawn/         # Spawn module tests (32 tests)
+│   │   ├── error/         # Error module tests (47 tests)
+│   │   └── tag/           # Tag module tests (14 tests)
+│   ├── tag_mapper/        # Tag mapper tests
+│   ├── support/           # Test infrastructure
+│   │   ├── mock_awesome.lua    # Canonical mock framework
+│   │   └── test_helpers.lua    # Standardized test patterns
+│   ├── *_spec.lua         # Core module unit tests
 │   └── integration_spec.lua # D-Bus integration tests
+├── examples/              # Usage examples and demonstrations
+│   └── spawning/          # AwesomeWM spawning examples (using awe modules)
 ├── scripts/               # Development scripts
 │   └── check-dev-tools.sh # Environment verification script
 ├── docs/                  # Documentation
+│   ├── coding-guidelines.md    # Coding standards and API patterns
+│   ├── developer-guide.md      # This file
+│   └── testing-guidelines.md   # Testing standards and patterns
 ├── planning/              # Project planning documents
+│   └── 07-awe-module-refactoring-plan.md # Architecture documentation
 ├── .github/workflows/     # CI/CD configuration
-├── diligent-scm-0.rockspec       # Production dependencies
+├── diligent-scm-0.rockspec       # Production dependencies (single entry point pattern)
 ├── diligent-dev-scm-0.rockspec   # Development dependencies
 ├── Makefile              # Build automation
 ├── .busted               # Test framework configuration
@@ -310,6 +665,14 @@ diligent/
 ├── .editorconfig         # Editor consistency config
 └── .gitignore            # Git ignore rules
 ```
+
+### Key Architecture Notes
+
+- **awe module**: Revolutionary modular architecture with dependency injection
+- **Factory Pattern**: Enables clean testing and dry-run support across all modules
+- **Single Entry Point**: `require("awe")` provides access to all submodules without rockspec clutter
+- **643 Tests**: Comprehensive test coverage with clean isolation using factory pattern
+- **Production Validated**: All example scripts working with modular API in real AwesomeWM
 
 ## Testing Strategy
 
