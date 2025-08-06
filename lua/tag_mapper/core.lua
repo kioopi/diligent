@@ -3,9 +3,35 @@ Tag Mapper Core Module
 
 Pure functions for tag resolution logic with no external dependencies.
 Separates tag resolution logic from AwesomeWM interaction for better testability.
+Enhanced with structured error handling instead of throwing exceptions.
 --]]
 
 local tag_mapper_core = {}
+
+-- Import error framework for structured error objects
+local error_reporter = require("diligent.error.reporter").create()
+
+-- Helper function to create validation error object
+local function create_validation_error(message, context)
+  return error_reporter.create_tag_resolution_error(
+    nil, -- no resource_id for validation errors
+    nil, -- no tag_spec for validation errors
+    "TAG_SPEC_INVALID",
+    message,
+    context or {}
+  )
+end
+
+-- Helper function to create tag spec error object
+local function create_tag_spec_error(tag_spec, message, error_type, context)
+  return error_reporter.create_tag_resolution_error(
+    nil, -- no resource_id at this level
+    tag_spec,
+    error_type or "TAG_SPEC_INVALID",
+    message,
+    context or {}
+  )
+end
 
 ---Check if a string contains only digits
 ---@param str string String to check
@@ -38,27 +64,28 @@ end
 ---@param tag_spec number|string Tag specification (relative offset, absolute string, or name)
 ---@param base_tag number Current base tag index for relative calculations
 ---@param screen_context table Screen context with available tags and metadata
----@return table result Structured tag resolution result
+---@return table|nil result Structured tag resolution result or nil on error
+---@return table|nil error Error object if validation fails
 function tag_mapper_core.resolve_tag_specification(
   tag_spec,
   base_tag,
   screen_context
 )
-  -- Input validation
+  -- Input validation - return error objects instead of throwing
   if tag_spec == nil then
-    error("tag spec is required")
+    return nil, create_validation_error("tag spec is required")
   end
 
   if base_tag == nil then
-    error("base tag is required")
+    return nil, create_validation_error("base tag is required")
   end
 
   if type(base_tag) ~= "number" then
-    error("base tag must be a number")
+    return nil, create_validation_error("base tag must be a number")
   end
 
   if screen_context == nil then
-    error("screen context is required")
+    return nil, create_validation_error("screen context is required")
   end
 
   -- Handle relative numeric offset
@@ -121,7 +148,12 @@ function tag_mapper_core.resolve_tag_specification(
   end
 
   -- Invalid tag spec type
-  error("invalid tag spec type: " .. type(tag_spec))
+  return nil, create_tag_spec_error(
+    tag_spec,
+    "invalid tag spec type: " .. type(tag_spec),
+    "TAG_SPEC_INVALID",
+    {tag_spec_type = type(tag_spec)}
+  )
 end
 
 ---Plan tag operations for a list of resources
@@ -129,23 +161,24 @@ end
 ---@param resources table List of resource objects with id and tag fields
 ---@param screen_context table Screen context with available tags and metadata
 ---@param base_tag number Current base tag index for relative calculations
----@return table plan Structured operation plan with assignments, creations, warnings
+---@return table|nil plan Structured operation plan with assignments, creations, warnings or nil on error
+---@return table|nil error Error object if validation fails
 function tag_mapper_core.plan_tag_operations(
   resources,
   screen_context,
   base_tag
 )
-  -- Input validation
+  -- Input validation - return error objects instead of throwing
   if resources == nil then
-    error("resources list is required")
+    return nil, create_validation_error("resources list is required")
   end
 
   if screen_context == nil then
-    error("screen context is required")
+    return nil, create_validation_error("screen context is required")
   end
 
   if base_tag == nil then
-    error("base tag is required")
+    return nil, create_validation_error("base tag is required")
   end
 
   -- Initialize plan structure
@@ -161,43 +194,53 @@ function tag_mapper_core.plan_tag_operations(
 
   -- Track which named tags need creation to avoid duplicates
   local tags_to_create = {}
+  
+  -- Track errors that occur during individual resource processing
+  local resource_errors = {}
 
   -- Process each resource
   for _, resource in ipairs(resources) do
     if resource.id and resource.tag ~= nil then
       -- Resolve tag specification for this resource
-      local resolution = tag_mapper_core.resolve_tag_specification(
+      local resolution, error_obj = tag_mapper_core.resolve_tag_specification(
         resource.tag,
         base_tag,
         screen_context
       )
 
-      -- Create assignment entry
-      local assignment = {
-        resource_id = resource.id,
-        type = resolution.type,
-        resolved_index = resolution.resolved_index,
-        name = resolution.name,
-        overflow = resolution.overflow,
-        original_index = resolution.original_index,
-        needs_creation = resolution.needs_creation,
-      }
-
-      table.insert(plan.assignments, assignment)
-
-      -- Handle overflow warnings
-      if resolution.overflow then
-        table.insert(plan.warnings, {
-          type = "overflow",
+      if resolution then
+        -- Create assignment entry
+        local assignment = {
           resource_id = resource.id,
+          type = resolution.type,
+          resolved_index = resolution.resolved_index,
+          name = resolution.name,
+          overflow = resolution.overflow,
           original_index = resolution.original_index,
-          final_index = resolution.resolved_index,
-        })
-      end
+          needs_creation = resolution.needs_creation,
+        }
 
-      -- Track named tags that need creation
-      if resolution.type == "named" and resolution.needs_creation then
-        tags_to_create[resolution.name] = true
+        table.insert(plan.assignments, assignment)
+        
+        -- Handle overflow warnings (only if resolution successful)
+        if resolution.overflow then
+          table.insert(plan.warnings, {
+            type = "overflow",
+            resource_id = resource.id,
+            original_index = resolution.original_index,
+            final_index = resolution.resolved_index,
+          })
+        end
+
+        -- Track named tags that need creation (only if resolution successful)
+        if resolution.type == "named" and resolution.needs_creation then
+          tags_to_create[resolution.name] = true
+        end
+      else
+        -- Handle individual resource error
+        error_obj.resource_id = resource.id  -- Add resource context
+        table.insert(resource_errors, error_obj)
+        -- Continue processing other resources
       end
     end
   end
@@ -209,6 +252,13 @@ function tag_mapper_core.plan_tag_operations(
       screen = screen_context.screen,
       operation = "create",
     })
+  end
+  
+  -- Handle resource errors if any occurred
+  if #resource_errors > 0 then
+    -- Add errors to the plan for processing by higher layers
+    plan.errors = resource_errors
+    plan.has_errors = true
   end
 
   return plan
