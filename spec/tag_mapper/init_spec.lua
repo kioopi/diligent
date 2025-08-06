@@ -51,6 +51,35 @@ describe("tag_mapper", function()
       assert.are.equal(5, result.index)
     end)
 
+    it(
+      "should resolve relative tags from current tag (bug fix verification)",
+      function()
+        -- BUG FIX TEST: User on tag 2 + offset 2 = tag 4 (not tag 3)
+        -- This verifies the fix where relative tags resolve from user's current tag,
+        -- not hardcoded tag 1 as in the original bug
+        local success, result = tag_mapper.resolve_tag(2, 2, mock_interface)
+
+        assert.is_true(success)
+        assert.is_table(result)
+        assert.are.equal(4, result.index)
+        assert.are.equal("4", result.name)
+      end
+    )
+
+    it("should handle different base tag scenarios", function()
+      -- Additional verification with different starting positions
+
+      -- User on tag 1 + offset 3 = tag 4
+      local success1, result1 = tag_mapper.resolve_tag(3, 1, mock_interface)
+      assert.is_true(success1)
+      assert.are.equal(4, result1.index)
+
+      -- User on tag 5 + offset 1 = tag 6
+      local success2, result2 = tag_mapper.resolve_tag(1, 5, mock_interface)
+      assert.is_true(success2)
+      assert.are.equal(6, result2.index)
+    end)
+
     it("should handle overflow by placing on tag 9", function()
       -- Current tag is 8, offset 2 would be 10, should overflow to 9
       local success, result = tag_mapper.resolve_tag(2, 8, mock_interface)
@@ -247,6 +276,139 @@ describe("tag_mapper", function()
         assert.is_table(result)
         assert.are.equal(test_case.expected, result.index)
       end
+    end)
+
+    it("should handle boundary conditions correctly", function()
+      -- Test boundary conditions for 1-9 tag range
+      local boundary_cases = {
+        -- Edge of range - tag 1
+        { base = 1, offset = 0, expected = 1 }, -- current tag 1
+        { base = 1, offset = 8, expected = 9 }, -- tag 1 + 8 = tag 9 (max)
+
+        -- Edge of range - tag 9
+        { base = 9, offset = 0, expected = 9 }, -- current tag 9
+        { base = 9, offset = 1, expected = 9 }, -- tag 9 + 1 = overflow to 9
+
+        -- Mid-range variations
+        { base = 4, offset = 3, expected = 7 }, -- tag 4 + 3 = tag 7
+        { base = 6, offset = 2, expected = 8 }, -- tag 6 + 2 = tag 8
+      }
+
+      for _, test_case in ipairs(boundary_cases) do
+        local success, result = tag_mapper.resolve_tag(
+          test_case.offset,
+          test_case.base,
+          mock_interface
+        )
+        assert.is_true(
+          success,
+          "Failed for base=" .. test_case.base .. " offset=" .. test_case.offset
+        )
+        assert.are.equal(
+          test_case.expected,
+          result.index,
+          "Expected "
+            .. test_case.expected
+            .. " for base="
+            .. test_case.base
+            .. " offset="
+            .. test_case.offset
+            .. ", got "
+            .. result.index
+        )
+      end
+    end)
+
+    it("should handle mixed tag types in sequence", function()
+      -- Test resolving different tag types from the same base
+      local base_tag = 3
+      local mixed_specs = {
+        { spec = 0, type = "relative", expected_index = 3 }, -- current
+        { spec = 2, type = "relative", expected_index = 5 }, -- +2
+        { spec = "7", type = "absolute", expected_index = 7 }, -- absolute
+        { spec = "workspace", type = "named", expected_name = "workspace" },
+      }
+
+      for _, test_case in ipairs(mixed_specs) do
+        local success, result =
+          tag_mapper.resolve_tag(test_case.spec, base_tag, mock_interface)
+        assert.is_true(success)
+
+        if test_case.expected_index then
+          assert.are.equal(test_case.expected_index, result.index)
+        end
+        if test_case.expected_name then
+          assert.are.equal(test_case.expected_name, result.name)
+        end
+      end
+    end)
+  end)
+
+  describe("DSL compatibility wrappers", function()
+    describe("validate_tag_spec", function()
+      it("should validate valid numeric tag specs", function()
+        local success, error = tag_mapper.validate_tag_spec(2)
+        assert.is_true(success)
+        assert.is_nil(error)
+      end)
+
+      it("should validate valid string tag specs", function()
+        local success, error = tag_mapper.validate_tag_spec("3")
+        assert.is_true(success)
+        assert.is_nil(error)
+      end)
+
+      it("should validate valid named tag specs", function()
+        local success, error = tag_mapper.validate_tag_spec("editor")
+        assert.is_true(success)
+        assert.is_nil(error)
+      end)
+
+      it("should reject invalid tag spec types", function()
+        local success, error = tag_mapper.validate_tag_spec(true)
+        assert.is_false(success)
+        assert.is_string(error)
+      end)
+
+      it("should reject nil tag specs", function()
+        local success, error = tag_mapper.validate_tag_spec(nil)
+        assert.is_false(success)
+        assert.is_string(error)
+      end)
+    end)
+
+    describe("describe_tag_spec", function()
+      it("should describe relative tag specs", function()
+        assert.are.equal(
+          "current tag (relative offset 0)",
+          tag_mapper.describe_tag_spec(0)
+        )
+        assert.are.equal("relative offset +2", tag_mapper.describe_tag_spec(2))
+      end)
+
+      it("should describe absolute tag specs", function()
+        assert.are.equal("absolute tag 3", tag_mapper.describe_tag_spec("3"))
+        assert.are.equal("absolute tag 9", tag_mapper.describe_tag_spec("9"))
+      end)
+
+      it("should describe named tag specs", function()
+        assert.are.equal(
+          "named tag 'editor'",
+          tag_mapper.describe_tag_spec("editor")
+        )
+        assert.are.equal(
+          "named tag 'browser'",
+          tag_mapper.describe_tag_spec("browser")
+        )
+      end)
+
+      it("should handle invalid tag specs", function()
+        assert.are.equal("invalid tag spec", tag_mapper.describe_tag_spec(nil))
+        assert.are.equal(
+          "invalid tag spec type: boolean",
+          tag_mapper.describe_tag_spec(true)
+        )
+      end)
     end)
   end)
 end)

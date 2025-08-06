@@ -1,5 +1,6 @@
 require("diligent.validators")
 local livr = require("LIVR")
+local tag_mapper = require("tag_mapper")
 
 local start_handler = {}
 
@@ -20,11 +21,32 @@ function start_handler.create(awe_module)
   function handler.execute(payload)
     local spawned_resources = {}
 
+    -- Get the interface for tag_mapper (tag_mapper expects raw interface, not awe_module)
+    local interface = awe_module.interface
+
+    -- Get current tag index using tag_mapper
+    local current_tag_index = tag_mapper.get_current_tag(interface)
+
     -- Phase 1: Sequential processing of resources
     for _, resource in ipairs(payload.resources or {}) do
+      -- Resolve tag specification to actual tag object
+      local tag_success, resolved_tag =
+        tag_mapper.resolve_tag(resource.tag_spec, current_tag_index, interface)
+
+      if not tag_success then
+        -- Tag resolution failed - return error immediately
+        return false,
+          {
+            error = "Tag resolution failed: "
+              .. (resolved_tag or "unknown error"),
+            failed_resource = resource.name,
+            project_name = payload.project_name,
+          }
+      end
+
       local pid, snid, message = awe_module.spawn.spawner.spawn_with_properties(
         resource.command,
-        resource.tag_spec,
+        resolved_tag,
         {
           working_dir = resource.working_dir,
           reuse = resource.reuse,

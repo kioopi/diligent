@@ -30,6 +30,7 @@ local initial_mock_data = {
     end,
   },
   last_spawn_call = nil,
+  spawn_calls = {},
   screen_context = {
     screen = { index = 1, name = "mock_screen" },
     current_tag_index = 1,
@@ -137,10 +138,17 @@ end
 ---@return string|nil snid Spawn notification ID
 function mock_interface.spawn(command, properties)
   -- Capture the spawn call for testing inspection
-  mock_data.last_spawn_call = {
+
+  local spawn_call = {
     command = command,
-    properties = properties,
+    properties = properties or {},
   }
+
+  -- last spawn call for easy inspection
+  mock_data.last_spawn_call = spawn_call
+
+  -- Store the spawn call in history
+  table.insert(mock_data.spawn_calls, spawn_call)
 
   if mock_data.spawn_config.success then
     return mock_data.spawn_config.pid, mock_data.spawn_config.snid
@@ -178,6 +186,12 @@ end
 ---@return table|nil spawn_call Table with command and properties, or nil if no calls made
 function mock_interface.get_last_spawn_call()
   return mock_data.last_spawn_call
+end
+
+---Get all spawn calls made during testing
+---@return table spawn_calls List of all spawn calls made
+function mock_interface.get_spawn_calls()
+  return mock_data.spawn_calls
 end
 
 --- Set the current tag index in the mock screen context

@@ -41,7 +41,7 @@ describe("Start Processor", function()
       local start_request =
         start_processor.convert_project_to_start_request(dsl_project)
 
-      assert.are.equal("0", start_request.resources[1].tag_spec) -- default
+      assert.are.equal(0, start_request.resources[1].tag_spec) -- default
       assert.is_nil(start_request.resources[1].working_dir) -- no default
       assert.is_false(start_request.resources[1].reuse) -- default false
     end)
@@ -70,11 +70,13 @@ describe("Start Processor", function()
 
       assert.are.equal(2, #start_request.resources)
 
+      local zed = start_request.resources[1]
+
       -- Check first resource
-      assert.are.equal("editor", start_request.resources[1].name)
-      assert.are.equal("zed", start_request.resources[1].command)
-      assert.are.equal(1, start_request.resources[1].tag_spec)
-      assert.is_true(start_request.resources[1].reuse)
+      assert.are.equal("editor", zed.name)
+      assert.are.equal("zed", zed.command)
+      assert.are.equal(1, zed.tag_spec)
+      assert.is_true(zed.reuse)
 
       -- Check second resource
       assert.are.equal("terminal", start_request.resources[2].name)
@@ -153,6 +155,106 @@ describe("Start Processor", function()
 
       assert.are.equal("no-resources-project", start_request.project_name)
       assert.are.equal(0, #start_request.resources)
+    end)
+  end)
+
+  describe("basic tag specification validation", function()
+    it("should accept valid numeric tag specifications", function()
+      local dsl_project = {
+        name = "numeric-tags",
+        resources = {
+          app1 = {
+            type = "app",
+            cmd = "gedit",
+            tag = 1, -- numeric - should be accepted
+          },
+          app2 = {
+            type = "app",
+            cmd = "firefox",
+            tag = 0, -- numeric zero - should be accepted
+          },
+        },
+      }
+
+      local start_request =
+        start_processor.convert_project_to_start_request(dsl_project)
+
+      -- Should preserve tag_spec values without parsing
+      assert.are.equal(1, start_request.resources[1].tag_spec)
+      assert.are.equal(0, start_request.resources[2].tag_spec)
+      -- Should not include tag_info anymore
+      assert.is_nil(start_request.resources[1].tag_info)
+      assert.is_nil(start_request.resources[2].tag_info)
+    end)
+
+    it("should accept valid string tag specifications", function()
+      local dsl_project = {
+        name = "string-tags",
+        resources = {
+          app1 = {
+            type = "app",
+            cmd = "gedit",
+            tag = "3", -- string digit - should be accepted
+          },
+          app2 = {
+            type = "app",
+            cmd = "firefox",
+            tag = "editor", -- string name - should be accepted
+          },
+        },
+      }
+
+      local start_request =
+        start_processor.convert_project_to_start_request(dsl_project)
+
+      -- Should preserve tag_spec values without parsing
+      assert.are.equal("3", start_request.resources[1].tag_spec)
+      assert.are.equal("editor", start_request.resources[2].tag_spec)
+      -- Should not include tag_info anymore
+      assert.is_nil(start_request.resources[1].tag_info)
+      assert.is_nil(start_request.resources[2].tag_info)
+    end)
+
+    it("should reject invalid tag specification types", function()
+      local dsl_project = {
+        name = "invalid-types",
+        resources = {
+          app1 = {
+            type = "app",
+            cmd = "gedit",
+            tag = true, -- boolean not supported
+          },
+        },
+      }
+
+      -- Should throw error due to invalid type
+      assert.has_error(
+        function()
+          start_processor.convert_project_to_start_request(dsl_project)
+        end,
+        "Invalid tag specification for resource 'app1': must be number or string, got boolean"
+      )
+    end)
+
+    it("should reject table tag specifications", function()
+      local dsl_project = {
+        name = "table-tags",
+        resources = {
+          app1 = {
+            type = "app",
+            cmd = "gedit",
+            tag = {}, -- table not supported
+          },
+        },
+      }
+
+      -- Should throw error due to invalid type
+      assert.has_error(
+        function()
+          start_processor.convert_project_to_start_request(dsl_project)
+        end,
+        "Invalid tag specification for resource 'app1': must be number or string, got table"
+      )
     end)
   end)
 end)

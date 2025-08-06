@@ -198,12 +198,14 @@ local function init_awe_module()
   return success, result
 end
 
--- Resolve tag spec using awe module
+-- Resolve tag spec using tag_mapper
 local function resolve_tag_spec(tag_spec)
   local lua_code = string.format(
     [[
-    local awe = _G.diligent_awe
-    local success, result = awe.tag.resolver.resolve_tag_spec("%s")
+    local tag_mapper = require("tag_mapper")
+    local interface = _G.diligent_awe.interface
+    local current_tag = tag_mapper.get_current_tag(interface)
+    local success, result = tag_mapper.resolve_tag("%s", current_tag, interface)
     
     if success then
       return "SUCCESS: Resolved to tag '" .. tostring(result.name or "unnamed") .. "' (index: " .. result.index .. ")"

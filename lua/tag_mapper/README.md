@@ -125,31 +125,50 @@ Coordinates between core logic and interface layers.
 
 ### 4. Public API (`init.lua`)
 
-Maintains backward compatibility while providing enhanced functionality.
+Provides both current functionality and future architectural patterns.
 
-#### Legacy Functions (Backward Compatible)
-- `get_current_tag()` - Returns current tag index
-- `resolve_tag(tag_spec, base_tag)` - Resolves single tag
-- `create_project_tag(project_name)` - Creates/finds project tag
+#### Current Primary API (Used by Start Command)
+- `get_current_tag(interface)` - Returns current tag index from interface
+- `resolve_tag(tag_spec, base_tag, interface)` - Resolves single tag specification
+- `validate_tag_spec(tag_value)` - DSL validation of tag specifications
+- `describe_tag_spec(tag_spec)` - Human-readable tag descriptions
 
-#### New High-Level Functions
-- `resolve_tags_for_project(resources, base_tag, interface)` - Batch resolution
-- `execute_tag_plan(plan, interface)` - Plan execution
+#### Future Architecture Functions (Available but Not Yet Used)
+**Note**: These represent the preferred architecture for batch operations and will be adopted in future phases:
+- `resolve_tags_for_project(resources, base_tag, interface)` - Batch resolution with planning
+- `execute_tag_plan(plan, interface)` - Execute pre-planned tag operations  
+- `create_project_tag(project_name, interface)` - Project-specific tag creation
+
+The future architecture separates planning (core logic) from execution (interface operations) for better testability and flexibility.
 
 ## Usage Examples
 
-### Basic Tag Resolution
+### Current Usage Pattern (Start Command)
 
 ```lua
 local tag_mapper = require("tag_mapper")
 
--- Legacy API (backward compatible)
-local current_tag = tag_mapper.get_current_tag()
-local success, tag = tag_mapper.resolve_tag("+1", current_tag)
-local success, project_tag = tag_mapper.create_project_tag("editor")
+-- Get current tag from interface
+local interface = awe_module.interface  
+local current_tag = tag_mapper.get_current_tag(interface)
+
+-- Resolve single tag specification
+local success, resolved_tag = tag_mapper.resolve_tag(2, current_tag, interface)
+if success then
+  -- resolved_tag = { index = 4, name = "4" } (current 2 + offset 2)
+  spawner.spawn_with_properties("firefox", resolved_tag, {})
+end
+
+-- DSL validation during project parsing
+local valid, error = tag_mapper.validate_tag_spec("editor")
+if valid then
+  local description = tag_mapper.describe_tag_spec("editor") -- "named tag 'editor'"
+end
 ```
 
-### Advanced Batch Operations
+### Future Architecture - Batch Operations
+
+**Note**: This represents the planned architecture for efficient batch tag resolution. Currently available but not yet used by the start command.
 
 ```lua
 local tag_mapper = require("tag_mapper")
@@ -157,12 +176,12 @@ local dry_run_interface = require("tag_mapper.interfaces.dry_run_interface")
 
 -- Define resources with tag specifications
 local resources = {
-  { id = "vim", tag = "+1" },      -- Relative: current + 1
+  { id = "vim", tag = 2 },         -- Relative: current + 2
   { id = "terminal", tag = "5" },   -- Absolute: tag 5
   { id = "browser", tag = "editor" } -- Named: find/create "editor"
 }
 
--- Preview operations (dry-run)
+-- Preview operations (dry-run) - Future pattern
 local results = tag_mapper.resolve_tags_for_project(
   resources, 
   current_tag, 
@@ -175,11 +194,11 @@ for _, operation in ipairs(log) do
   print(operation.operation .. ": " .. (operation.tag_name or ""))
 end
 
--- Execute for real
+-- Execute for real - Future pattern
 local real_results = tag_mapper.resolve_tags_for_project(
   resources,
-  current_tag
-  -- awesome_interface used by default
+  current_tag,
+  awesome_interface
 )
 ```
 

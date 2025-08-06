@@ -163,4 +163,82 @@ function tag_mapper.execute_tag_plan(plan, interface)
   return integration.execute_tag_plan(plan, interface)
 end
 
+-- DSL interface functions
+-- These provide tag validation and description for DSL processing
+
+---Validate tag specification for DSL processing
+---@param tag_value number|string Tag specification from DSL
+---@return boolean success True if validation passed
+---@return string|nil error Error message if validation failed
+function tag_mapper.validate_tag_spec(tag_value)
+  -- Input validation
+  if tag_value == nil then
+    return false, "tag specification cannot be nil"
+  end
+
+  local tag_type = type(tag_value)
+
+  if tag_type == "number" then
+    -- Numeric tags are relative offsets
+    if tag_value < 0 then
+      return false, "negative tag offsets not supported in v1.0"
+    end
+    return true, nil
+  elseif tag_type == "string" then
+    if tag_value == "" then
+      return false, "tag specification cannot be empty string"
+    end
+
+    -- Check if string contains only digits
+    local numeric_value = tonumber(tag_value)
+    if numeric_value then
+      -- String digits are absolute numeric tags
+      if numeric_value < 1 or numeric_value > 9 then
+        return false,
+          "absolute tag must be between 1 and 9, got " .. numeric_value
+      end
+      return true, nil
+    else
+      -- Non-numeric strings are named tags
+      -- Validate tag name format (basic validation)
+      if not tag_value:match("^[a-zA-Z][a-zA-Z0-9_-]*$") then
+        return false,
+          "invalid tag name format: must start with letter and contain only letters, numbers, underscore, or dash"
+      end
+      return true, nil
+    end
+  else
+    return false, "tag must be a number or string, got " .. tag_type
+  end
+end
+
+---Get human-readable description of tag specification
+---@param tag_spec number|string Tag specification to describe
+---@return string description Human-readable tag description
+function tag_mapper.describe_tag_spec(tag_spec)
+  if tag_spec == nil then
+    return "invalid tag spec"
+  end
+
+  local tag_type = type(tag_spec)
+
+  if tag_type == "number" then
+    if tag_spec == 0 then
+      return "current tag (relative offset 0)"
+    else
+      return "relative offset +" .. tag_spec
+    end
+  elseif tag_type == "string" then
+    -- Check if string contains only digits
+    local numeric_value = tonumber(tag_spec)
+    if numeric_value then
+      return "absolute tag " .. numeric_value
+    else
+      return "named tag '" .. tag_spec .. "'"
+    end
+  else
+    return "invalid tag spec type: " .. tag_type
+  end
+end
+
 return tag_mapper
