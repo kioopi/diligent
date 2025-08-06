@@ -18,28 +18,39 @@ local reporter_factory = {}
 local function get_error_suggestions(error_type, context)
   local classifier = require("diligent.error.classifier").create()
   local ERROR_TYPES = classifier.ERROR_TYPES
-  
+
   context = context or {}
 
   if error_type == "TAG_OVERFLOW" or error_type == ERROR_TYPES.TAG_OVERFLOW then
     local suggestions = {
-      "Consider using absolute tag specification (e.g., \"9\")",
+      'Consider using absolute tag specification (e.g., "9")',
     }
     if context.resolved_index then
-      table.insert(suggestions, "Check if relative offset +" .. (context.resolved_index - (context.base_tag or 1)) .. " was intended")
+      table.insert(
+        suggestions,
+        "Check if relative offset +"
+          .. (context.resolved_index - (context.base_tag or 1))
+          .. " was intended"
+      )
     end
     return suggestions
-  elseif error_type == "TAG_SPEC_INVALID" or error_type == ERROR_TYPES.TAG_SPEC_INVALID then
+  elseif
+    error_type == "TAG_SPEC_INVALID"
+    or error_type == ERROR_TYPES.TAG_SPEC_INVALID
+  then
     return {
       "Provide tag as number (relative offset) or string (absolute/named)",
-      "Check DSL syntax for tag specification", 
-      "Valid examples: tag = 2 (relative), tag = \"3\" (absolute), tag = \"editor\" (named)"
+      "Check DSL syntax for tag specification",
+      'Valid examples: tag = 2 (relative), tag = "3" (absolute), tag = "editor" (named)',
     }
-  elseif error_type == "TAG_NAME_INVALID" or error_type == ERROR_TYPES.TAG_NAME_INVALID then
+  elseif
+    error_type == "TAG_NAME_INVALID"
+    or error_type == ERROR_TYPES.TAG_NAME_INVALID
+  then
     return {
       "Tag names must start with a letter",
       "Use only letters, numbers, underscore, or dash in tag names",
-      "Valid examples: \"editor\", \"workspace-1\", \"dev_environment\""
+      'Valid examples: "editor", "workspace-1", "dev_environment"',
     }
   elseif error_type == ERROR_TYPES.COMMAND_NOT_FOUND then
     local app_name = context.app_name or "application"
@@ -82,9 +93,15 @@ local function get_error_suggestions(error_type, context)
 end
 
 -- Create structured tag resolution error object
-local function create_tag_resolution_error(resource_id, tag_spec, error_type, message, context)
+local function create_tag_resolution_error(
+  resource_id,
+  tag_spec,
+  error_type,
+  message,
+  context
+)
   context = context or {}
-  
+
   local error_obj = {
     category = "TAG_RESOLUTION_ERROR",
     resource_id = resource_id,
@@ -95,8 +112,8 @@ local function create_tag_resolution_error(resource_id, tag_spec, error_type, me
     suggestions = get_error_suggestions(error_type, context),
     metadata = {
       timestamp = os.time(),
-      phase = "planning"
-    }
+      phase = "planning",
+    },
   }
 
   return error_obj
@@ -107,7 +124,7 @@ local function aggregate_errors(errors)
   if not errors or #errors == 0 then
     return nil
   end
-  
+
   if #errors == 1 then
     return errors[1]
   end
@@ -120,7 +137,7 @@ local function aggregate_errors(errors)
   end
 
   -- Create summary message
-  local summary_parts = {tostring(#errors) .. " errors occurred:"}
+  local summary_parts = { tostring(#errors) .. " errors occurred:" }
   for error_type, count in pairs(error_type_counts) do
     if count == 1 then
       table.insert(summary_parts, error_type)
@@ -128,17 +145,17 @@ local function aggregate_errors(errors)
       table.insert(summary_parts, count .. "x " .. error_type)
     end
   end
-  
+
   local aggregated = {
     type = "MULTIPLE_TAG_ERRORS",
-    category = "TAG_RESOLUTION_ERROR", 
+    category = "TAG_RESOLUTION_ERROR",
     message = table.concat(summary_parts, ", "),
     errors = errors,
     metadata = {
       timestamp = os.time(),
       error_count = #errors,
-      error_types = error_type_counts
-    }
+      error_types = error_type_counts,
+    },
   }
 
   return aggregated
@@ -167,8 +184,10 @@ local function create_spawn_summary(spawn_results)
       summary.failed = summary.failed + 1
 
       -- Count error types
-      local error_type = result.error_report and result.error_report.type or "UNKNOWN"
-      summary.error_types[error_type] = (summary.error_types[error_type] or 0) + 1
+      local error_type = result.error_report and result.error_report.type
+        or "UNKNOWN"
+      summary.error_types[error_type] = (summary.error_types[error_type] or 0)
+        + 1
     end
   end
 

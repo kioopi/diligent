@@ -24,7 +24,7 @@ local ERROR_TYPES = {
   DEPENDENCY_FAILED = "DEPENDENCY_FAILED",
   TAG_RESOLUTION_FAILED = "TAG_RESOLUTION_FAILED",
   UNKNOWN = "UNKNOWN",
-  
+
   -- New tag resolution specific error types
   TAG_SPEC_INVALID = "TAG_SPEC_INVALID",
   TAG_OVERFLOW = "TAG_OVERFLOW",
@@ -41,17 +41,32 @@ local function classify_error(error_message)
   local msg_lower = error_message:lower()
 
   -- Tag resolution specific errors (check these first for specificity)
-  if msg_lower:find("tag overflow") or msg_lower:find("overflow.*tag") or msg_lower:find("tag.*index.*overflow") then
+  if
+    msg_lower:find("tag overflow")
+    or msg_lower:find("overflow.*tag")
+    or msg_lower:find("tag.*index.*overflow")
+  then
     return ERROR_TYPES.TAG_OVERFLOW, "Tag overflow"
-  elseif msg_lower:find("invalid tag spec") or msg_lower:find("tag spec.*invalid") then
+  elseif
+    msg_lower:find("invalid tag spec") or msg_lower:find("tag spec.*invalid")
+  then
     return ERROR_TYPES.TAG_SPEC_INVALID, "Invalid tag specification"
-  elseif msg_lower:find("invalid tag name") or msg_lower:find("tag name.*invalid") or msg_lower:find("tag name.*validation.*failed") then
+  elseif
+    msg_lower:find("invalid tag name")
+    or msg_lower:find("tag name.*invalid")
+    or msg_lower:find("tag name.*validation.*failed")
+  then
     return ERROR_TYPES.TAG_NAME_INVALID, "Invalid tag name"
-  elseif msg_lower:find("multiple.*tag.*error") or msg_lower:find("multiple.*error.*tag") or msg_lower:find("%d+.*error.*tag") then
+  elseif
+    msg_lower:find("multiple.*tag.*error")
+    or msg_lower:find("multiple.*error.*tag")
+    or msg_lower:find("%d+.*error.*tag")
+  then
     return ERROR_TYPES.MULTIPLE_TAG_ERRORS, "Multiple tag errors"
   elseif msg_lower:find("tag resolution failed") then
-    return ERROR_TYPES.TAG_RESOLUTION_FAILED, "Could not resolve tag specification"
-  
+    return ERROR_TYPES.TAG_RESOLUTION_FAILED,
+      "Could not resolve tag specification"
+
   -- Original error patterns
   elseif msg_lower:find("no such file or directory") then
     return ERROR_TYPES.COMMAND_NOT_FOUND, "Command not found in PATH"
@@ -66,7 +81,8 @@ local function classify_error(error_message)
   else
     -- Check if it's likely a tag-related error even if pattern doesn't match
     if msg_lower:find("tag") then
-      return ERROR_TYPES.TAG_RESOLUTION_FAILED, "Tag-related error: " .. error_message
+      return ERROR_TYPES.TAG_RESOLUTION_FAILED,
+        "Tag-related error: " .. error_message
     end
     return ERROR_TYPES.UNKNOWN, "Unclassified error: " .. error_message
   end

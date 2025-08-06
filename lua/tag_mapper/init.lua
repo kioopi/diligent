@@ -156,12 +156,12 @@ function tag_mapper.resolve_tags_for_project(resources, base_tag, interface)
   end
 
   -- Use existing architecture: plan -> execute -> extract
-  local success, workflow_result = pcall(function()
-    return integration.resolve_tags_for_project(resources, base_tag, interface)
-  end)
+  local workflow_result, error_obj = integration.resolve_tags_for_project(resources, base_tag, interface)
 
-  if not success then
-    return false, "Tag resolution failed: " .. workflow_result
+  if not workflow_result then
+    -- Handle structured error object
+    local error_message = error_obj and error_obj.message or "unknown error"
+    return false, "Tag resolution failed: " .. error_message
   end
 
   -- Check execution status

@@ -70,7 +70,6 @@ describe("Start Handler", function()
 
   describe("create", function()
     it("should create handler with execute function", function()
-
       assert.is_table(handler)
       assert.is_function(handler.execute)
     end)
@@ -118,7 +117,10 @@ describe("Start Handler", function()
         },
       }
 
-      mock_interface.set_spawn_config({ success = false, error = "Error: Command not found" })
+      mock_interface.set_spawn_config({
+        success = false,
+        error = "Error: Command not found",
+      })
       local error = assert.no.success(handler.execute(payload))
 
       assert.matches("Command not found", error.error)

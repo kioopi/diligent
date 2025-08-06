@@ -19,7 +19,7 @@ describe("diligent.error.reporter", function()
         { -- context
           base_tag = 2,
           resolved_index = 11,
-          final_index = 9
+          final_index = 9,
         }
       )
 
@@ -46,7 +46,10 @@ describe("diligent.error.reporter", function()
 
     it("should handle missing context gracefully", function()
       local error_obj = reporter.create_tag_resolution_error(
-        "editor", 2, "TAG_OVERFLOW", "Tag overflow"
+        "editor",
+        2,
+        "TAG_OVERFLOW",
+        "Tag overflow"
         -- no context provided
       )
 
@@ -58,7 +61,11 @@ describe("diligent.error.reporter", function()
   describe("tag-specific error suggestions", function()
     it("should provide overflow-specific suggestions", function()
       local error_obj = reporter.create_tag_resolution_error(
-        "editor", 2, "TAG_OVERFLOW", "Overflow", {resolved_index = 11, final_index = 9}
+        "editor",
+        2,
+        "TAG_OVERFLOW",
+        "Overflow",
+        { resolved_index = 11, final_index = 9 }
       )
 
       local suggestions = error_obj.suggestions
@@ -77,7 +84,10 @@ describe("diligent.error.reporter", function()
 
     it("should provide invalid spec suggestions", function()
       local error_obj = reporter.create_tag_resolution_error(
-        "editor", true, "TAG_SPEC_INVALID", "Invalid spec type"
+        "editor",
+        true,
+        "TAG_SPEC_INVALID",
+        "Invalid spec type"
       )
 
       local suggestions = error_obj.suggestions
@@ -88,12 +98,18 @@ describe("diligent.error.reporter", function()
           break
         end
       end
-      assert.is_true(has_type_suggestion, "Should find 'number or string' in suggestions")
+      assert.is_true(
+        has_type_suggestion,
+        "Should find 'number or string' in suggestions"
+      )
     end)
 
     it("should provide tag name format suggestions", function()
       local error_obj = reporter.create_tag_resolution_error(
-        "editor", "123invalid", "TAG_NAME_INVALID", "Invalid name format"
+        "editor",
+        "123invalid",
+        "TAG_NAME_INVALID",
+        "Invalid name format"
       )
 
       local suggestions = error_obj.suggestions
@@ -113,19 +129,19 @@ describe("diligent.error.reporter", function()
       local errors = {
         {
           resource_id = "editor",
-          type = "TAG_OVERFLOW", 
-          message = "Tag overflow"
+          type = "TAG_OVERFLOW",
+          message = "Tag overflow",
         },
         {
           resource_id = "browser",
           type = "TAG_SPEC_INVALID",
-          message = "Invalid tag spec"
+          message = "Invalid tag spec",
         },
         {
           resource_id = "terminal",
-          type = "TAG_NAME_INVALID", 
-          message = "Invalid tag name"
-        }
+          type = "TAG_NAME_INVALID",
+          message = "Invalid tag name",
+        },
       }
 
       local aggregated = reporter.aggregate_errors(errors)
@@ -149,7 +165,7 @@ describe("diligent.error.reporter", function()
 
     it("should handle single error input", function()
       local errors = {
-        {resource_id = "editor", type = "TAG_OVERFLOW", message = "Overflow"}
+        { resource_id = "editor", type = "TAG_OVERFLOW", message = "Overflow" },
       }
 
       local result = reporter.aggregate_errors(errors)
@@ -161,7 +177,7 @@ describe("diligent.error.reporter", function()
 
     it("should handle empty error list", function()
       local result = reporter.aggregate_errors({})
-      
+
       assert.is_nil(result)
     end)
   end)
@@ -175,23 +191,23 @@ describe("diligent.error.reporter", function()
           error_report = {
             type = "TAG_OVERFLOW",
             category = "TAG_RESOLUTION_ERROR",
-            message = "Tag overflow"
-          }
+            message = "Tag overflow",
+          },
         },
         {
           success = false,
           resource_id = "browser",
           error_report = {
             type = "COMMAND_NOT_FOUND",
-            category = "SPAWN_ERROR", 
-            message = "Command not found"
-          }
+            category = "SPAWN_ERROR",
+            message = "Command not found",
+          },
         },
         {
           success = true,
           resource_id = "terminal",
-          pid = 12345
-        }
+          pid = 12345,
+        },
       }
 
       local summary = reporter.create_spawn_summary(spawn_results)

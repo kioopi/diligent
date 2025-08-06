@@ -19,12 +19,12 @@ describe("diligent.error.formatter", function()
         context = {
           base_tag = 2,
           resolved_index = 11,
-          final_index = 9
+          final_index = 9,
         },
         suggestions = {
-          "Consider using absolute tag \"9\" instead", 
-          "Check if relative offset +9 was intended"
-        }
+          'Consider using absolute tag "9" instead',
+          "Check if relative offset +9 was intended",
+        },
       }
 
       local formatted = formatter.format_tag_error_for_cli(error_obj)
@@ -44,8 +44,8 @@ describe("diligent.error.formatter", function()
         message = "Invalid tag specification: must be number or string",
         suggestions = {
           "Provide tag as number (relative offset) or string (absolute/named)",
-          "Check DSL syntax for tag specification"
-        }
+          "Check DSL syntax for tag specification",
+        },
       }
 
       local formatted = formatter.format_tag_error_for_cli(error_obj)
@@ -59,7 +59,7 @@ describe("diligent.error.formatter", function()
       local error_obj = {
         type = "TAG_OVERFLOW",
         resource_id = "editor",
-        message = "Tag overflow"
+        message = "Tag overflow",
         -- no suggestions
       }
 
@@ -80,17 +80,17 @@ describe("diligent.error.formatter", function()
           error = {
             type = "TAG_OVERFLOW",
             message = "Tag overflow: 11 → 9",
-            suggestions = {"Use absolute tag \"9\""}
-          }
+            suggestions = { 'Use absolute tag "9"' },
+          },
         },
         {
-          phase = "tag_resolution", 
+          phase = "tag_resolution",
           resource_id = "browser",
           error = {
             type = "TAG_SPEC_INVALID",
             message = "Invalid tag spec: boolean",
-            suggestions = {"Use number or string"}
-          }
+            suggestions = { "Use number or string" },
+          },
         },
         {
           phase = "spawning",
@@ -98,9 +98,9 @@ describe("diligent.error.formatter", function()
           error = {
             type = "COMMAND_NOT_FOUND",
             message = "Command 'alacritty' not found",
-            suggestions = {"Install alacritty package"}
-          }
-        }
+            suggestions = { "Install alacritty package" },
+          },
+        },
       }
 
       local formatted = formatter.format_multiple_errors_for_cli(errors)
@@ -111,7 +111,7 @@ describe("diligent.error.formatter", function()
 
       -- Should show all resources
       assert.matches("editor", formatted)
-      assert.matches("browser", formatted) 
+      assert.matches("browser", formatted)
       assert.matches("terminal", formatted)
 
       -- Should show error details
@@ -121,7 +121,10 @@ describe("diligent.error.formatter", function()
 
       -- Should show suggestions with bullet points
       local bullet_count = select(2, formatted:gsub("•", ""))
-      assert.is_true(bullet_count >= 3, "Should have at least 3 bullet points for suggestions")
+      assert.is_true(
+        bullet_count >= 3,
+        "Should have at least 3 bullet points for suggestions"
+      )
     end)
 
     it("should handle single phase errors", function()
@@ -129,13 +132,13 @@ describe("diligent.error.formatter", function()
         {
           phase = "tag_resolution",
           resource_id = "editor",
-          error = {type = "TAG_OVERFLOW", message = "Overflow"}
+          error = { type = "TAG_OVERFLOW", message = "Overflow" },
         },
         {
           phase = "tag_resolution",
-          resource_id = "browser", 
-          error = {type = "TAG_SPEC_INVALID", message = "Invalid"}
-        }
+          resource_id = "browser",
+          error = { type = "TAG_SPEC_INVALID", message = "Invalid" },
+        },
       }
 
       local formatted = formatter.format_multiple_errors_for_cli(errors)
@@ -149,28 +152,29 @@ describe("diligent.error.formatter", function()
     it("should format partial success information", function()
       local partial_success = {
         spawned_resources = {
-          {name = "terminal", pid = 12345},
-          {name = "editor", pid = 12346}
+          { name = "terminal", pid = 12345 },
+          { name = "editor", pid = 12346 },
         },
-        total_spawned = 2
+        total_spawned = 2,
       }
 
-      local formatted = formatter.format_partial_success_for_cli(partial_success)
+      local formatted =
+        formatter.format_partial_success_for_cli(partial_success)
 
       assert.matches("PARTIAL SUCCESS", formatted)
       assert.matches("terminal.*12345", formatted)
-      assert.matches("editor.*12346", formatted) 
+      assert.matches("editor.*12346", formatted)
       assert.matches("✓", formatted) -- success checkmarks
     end)
 
     it("should handle empty partial success", function()
       local partial_success = {
         spawned_resources = {},
-        total_spawned = 0
+        total_spawned = 0,
       }
 
       local result = formatter.format_partial_success_for_cli(partial_success)
-      
+
       assert.is_nil(result) -- Should not format anything for empty success
     end)
   end)
@@ -183,14 +187,14 @@ describe("diligent.error.formatter", function()
           resource_id = "browser",
           original_index = 11,
           final_index = 9,
-          suggestion = "Use absolute tag \"9\" for clarity"
+          suggestion = 'Use absolute tag "9" for clarity',
         },
         {
           type = "tag_creation",
-          resource_id = "terminal", 
+          resource_id = "terminal",
           tag_name = "workspace",
-          suggestion = "Tag \"workspace\" will be created"
-        }
+          suggestion = 'Tag "workspace" will be created',
+        },
       }
 
       local formatted = formatter.format_dry_run_warnings(warnings)
@@ -205,7 +209,7 @@ describe("diligent.error.formatter", function()
 
     it("should handle no warnings", function()
       local result = formatter.format_dry_run_warnings({})
-      
+
       assert.is_nil(result)
     end)
   end)

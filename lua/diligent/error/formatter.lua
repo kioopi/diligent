@@ -21,21 +21,26 @@ local function format_tag_error_for_cli(error_obj)
   end
 
   local lines = {}
-  
+
   -- Main error line with resource and type
   local main_line = "  ✗ " .. (error_obj.resource_id or "unknown")
-  
+
   if error_obj.type == "TAG_OVERFLOW" and error_obj.context then
     local ctx = error_obj.context
     if ctx.resolved_index and ctx.final_index then
-      main_line = main_line .. ": Tag overflow (" .. ctx.resolved_index .. " → " .. ctx.final_index .. ")"
+      main_line = main_line
+        .. ": Tag overflow ("
+        .. ctx.resolved_index
+        .. " → "
+        .. ctx.final_index
+        .. ")"
     else
       main_line = main_line .. ": " .. (error_obj.message or "Tag overflow")
     end
   else
     main_line = main_line .. ": " .. (error_obj.message or "Error occurred")
   end
-  
+
   table.insert(lines, main_line)
 
   -- Add suggestions if available
@@ -55,7 +60,7 @@ local function format_multiple_errors_for_cli(errors)
   end
 
   local lines = {}
-  
+
   -- Group errors by phase
   local phases = {}
   for _, error_entry in ipairs(errors) do
@@ -87,7 +92,7 @@ local function format_multiple_errors_for_cli(errors)
       local formatted = format_tag_error_for_cli(error_obj)
       table.insert(lines, formatted)
     end
-    
+
     table.insert(lines, "") -- Empty line between phases
   end
 
@@ -101,14 +106,21 @@ end
 
 -- Format partial success information for CLI
 local function format_partial_success_for_cli(partial_success)
-  if not partial_success or not partial_success.spawned_resources or #partial_success.spawned_resources == 0 then
+  if
+    not partial_success
+    or not partial_success.spawned_resources
+    or #partial_success.spawned_resources == 0
+  then
     return nil
   end
 
-  local lines = {"PARTIAL SUCCESS:"}
-  
+  local lines = { "PARTIAL SUCCESS:" }
+
   for _, resource in ipairs(partial_success.spawned_resources) do
-    table.insert(lines, "  ✓ " .. resource.name .. " (PID: " .. resource.pid .. ")")
+    table.insert(
+      lines,
+      "  ✓ " .. resource.name .. " (PID: " .. resource.pid .. ")"
+    )
   end
 
   return table.concat(lines, "\n")
@@ -120,24 +132,32 @@ local function format_dry_run_warnings(warnings)
     return nil
   end
 
-  local lines = {"WARNINGS:"}
-  
+  local lines = { "WARNINGS:" }
+
   for _, warning in ipairs(warnings) do
     local warning_line = "  ⚠ " .. (warning.resource_id or "unknown")
-    
+
     if warning.type == "overflow" then
       warning_line = warning_line .. ": Tag overflow detected"
       if warning.original_index and warning.final_index then
-        warning_line = warning_line .. " (" .. warning.original_index .. " → " .. warning.final_index .. ")"
+        warning_line = warning_line
+          .. " ("
+          .. warning.original_index
+          .. " → "
+          .. warning.final_index
+          .. ")"
       end
     elseif warning.type == "tag_creation" then
-      warning_line = warning_line .. ": Tag \"" .. (warning.tag_name or "unknown") .. "\" will be created"
+      warning_line = warning_line
+        .. ': Tag "'
+        .. (warning.tag_name or "unknown")
+        .. '" will be created'
     else
       warning_line = warning_line .. ": " .. (warning.message or "Warning")
     end
-    
+
     table.insert(lines, warning_line)
-    
+
     -- Add suggestion if available
     if warning.suggestion then
       table.insert(lines, "    Suggestion: " .. warning.suggestion)
@@ -156,7 +176,8 @@ local function format_error_for_user(error_report)
   local lines = {}
   table.insert(
     lines,
-    "✗ Failed to process " .. (error_report.resource_id or error_report.app_name or "resource")
+    "✗ Failed to process "
+      .. (error_report.resource_id or error_report.app_name or "resource")
   )
 
   if error_report.user_message then

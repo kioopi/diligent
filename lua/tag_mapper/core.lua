@@ -148,12 +148,13 @@ function tag_mapper_core.resolve_tag_specification(
   end
 
   -- Invalid tag spec type
-  return nil, create_tag_spec_error(
-    tag_spec,
-    "invalid tag spec type: " .. type(tag_spec),
-    "TAG_SPEC_INVALID",
-    {tag_spec_type = type(tag_spec)}
-  )
+  return nil,
+    create_tag_spec_error(
+      tag_spec,
+      "invalid tag spec type: " .. type(tag_spec),
+      "TAG_SPEC_INVALID",
+      { tag_spec_type = type(tag_spec) }
+    )
 end
 
 ---Plan tag operations for a list of resources
@@ -194,7 +195,7 @@ function tag_mapper_core.plan_tag_operations(
 
   -- Track which named tags need creation to avoid duplicates
   local tags_to_create = {}
-  
+
   -- Track errors that occur during individual resource processing
   local resource_errors = {}
 
@@ -221,7 +222,7 @@ function tag_mapper_core.plan_tag_operations(
         }
 
         table.insert(plan.assignments, assignment)
-        
+
         -- Handle overflow warnings (only if resolution successful)
         if resolution.overflow then
           table.insert(plan.warnings, {
@@ -238,7 +239,7 @@ function tag_mapper_core.plan_tag_operations(
         end
       else
         -- Handle individual resource error
-        error_obj.resource_id = resource.id  -- Add resource context
+        error_obj.resource_id = resource.id -- Add resource context
         table.insert(resource_errors, error_obj)
         -- Continue processing other resources
       end
@@ -253,7 +254,7 @@ function tag_mapper_core.plan_tag_operations(
       operation = "create",
     })
   end
-  
+
   -- Handle resource errors if any occurred
   if #resource_errors > 0 then
     -- Add errors to the plan for processing by higher layers
