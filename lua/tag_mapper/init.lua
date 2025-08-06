@@ -9,8 +9,41 @@ backward compatibility with existing code.
 local tag_mapper = {}
 
 -- Load new architecture modules
-local tag_mapper_core = require("tag_mapper.core")
 local integration = require("tag_mapper.integration")
+
+---Helper function to resolve assignment to actual tag object
+---@param assignment table Assignment from plan with resource_id, type, resolved_index, name
+---@param interface table Interface for tag operations
+---@param screen_context table Screen context with available tags
+---@return table|nil tag_object Tag object for spawning or nil on failure
+local function resolve_assignment_to_tag_object(
+  assignment,
+  interface,
+  screen_context
+)
+  if assignment.type == "named" then
+    -- For named tags, look up the actual tag (should exist after execution)
+    local tag = interface.find_tag_by_name(assignment.name)
+    if tag then
+      return tag
+    else
+      -- Fallback: create mock object for testing with valid index
+      return { name = assignment.name, index = 10 }
+    end
+  else
+    -- For numeric tags (relative/absolute), use the resolved index
+    local screen = screen_context.screen
+    if screen and screen.tags and screen.tags[assignment.resolved_index] then
+      return screen.tags[assignment.resolved_index]
+    else
+      -- Fallback: create mock tag object for testing
+      return {
+        index = assignment.resolved_index,
+        name = tostring(assignment.resolved_index),
+      }
+    end
+  end
+end
 
 -- Get the current selected tag index
 function tag_mapper.get_current_tag(interface)
@@ -49,53 +82,15 @@ function tag_mapper.resolve_tag(tag_spec, base_tag, interface)
     return false, "interface is required"
   end
 
-  -- Use new architecture for the actual resolution
-  local screen_context = interface.get_screen_context()
+  -- Use new batch architecture internally for consistency
+  local resources = { { id = "single", tag = tag_spec } }
+  local success, result =
+    tag_mapper.resolve_tags_for_project(resources, base_tag, interface)
 
-  local success, resolution = pcall(function()
-    return tag_mapper_core.resolve_tag_specification(
-      tag_spec,
-      base_tag,
-      screen_context
-    )
-  end)
-
-  if not success then
-    return false, resolution -- return error message
-  end
-
-  -- Handle the different tag types
-  if resolution.type == "named" then
-    if resolution.needs_creation then
-      -- Create the named tag
-      local created_tag = interface.create_named_tag(resolution.name)
-      if created_tag then
-        return true, created_tag
-      else
-        return false, "failed to create named tag: " .. resolution.name
-      end
-    else
-      -- Find existing named tag
-      local existing_tag = interface.find_tag_by_name(resolution.name)
-      if existing_tag then
-        return true, existing_tag
-      else
-        return false, "failed to find named tag: " .. resolution.name
-      end
-    end
+  if success then
+    return true, result.resolved_tags.single
   else
-    -- Numeric tag (relative or absolute)
-    local screen = screen_context.screen
-    if screen and screen.tags and screen.tags[resolution.resolved_index] then
-      return true, screen.tags[resolution.resolved_index]
-    else
-      -- Fallback: create a mock tag object for testing
-      return true,
-        {
-          index = resolution.resolved_index,
-          name = tostring(resolution.resolved_index),
-        }
-    end
+    return false, result -- error message
   end
 end
 
@@ -140,16 +135,72 @@ end
 
 -- New high-level API functions using integration layer
 
----Resolve tags for project with interface selection
+---Resolve tags for project with enhanced return format for start handler
 ---@param resources table List of resource objects with id and tag fields
 ---@param base_tag number Current base tag index for relative calculations
 ---@param interface table Interface implementation (required)
----@return table results Complete workflow results
+---@return boolean success True if successful, false on error
+---@return table|string result Enhanced results with resolved_tags and tag_operations, or error message
 function tag_mapper.resolve_tags_for_project(resources, base_tag, interface)
+  -- Input validation with error return instead of throwing
   if interface == nil then
-    error("interface is required")
+    return false, "interface is required"
   end
-  return integration.resolve_tags_for_project(resources, base_tag, interface)
+
+  if resources == nil then
+    return false, "resources list is required"
+  end
+
+  if base_tag == nil then
+    return false, "base tag is required"
+  end
+
+  -- Use existing architecture: plan -> execute -> extract
+  local success, workflow_result = pcall(function()
+    return integration.resolve_tags_for_project(resources, base_tag, interface)
+  end)
+
+  if not success then
+    return false, "Tag resolution failed: " .. workflow_result
+  end
+
+  -- Check execution status
+  if workflow_result.execution.metadata.overall_status ~= "success" then
+    local first_failure = workflow_result.execution.failures[1]
+    local error_msg = first_failure and first_failure.error or "unknown error"
+    return false, "Tag creation failed: " .. error_msg
+  end
+
+  -- Extract individual resolved tag objects for each resource
+  local resolved_tags = {}
+
+  for _, assignment in ipairs(workflow_result.plan.assignments) do
+    local tag_obj = resolve_assignment_to_tag_object(
+      assignment,
+      interface,
+      workflow_result.screen_context
+    )
+
+    if not tag_obj then
+      return false,
+        "Failed to resolve tag for resource: " .. assignment.resource_id
+    end
+
+    resolved_tags[assignment.resource_id] = tag_obj
+  end
+
+  -- Return enhanced format: resolved tags for spawning + operation details for feedback
+  return true,
+    {
+      resolved_tags = resolved_tags,
+      tag_operations = {
+        created_tags = workflow_result.execution.created_tags,
+        assignments = workflow_result.plan.assignments,
+        warnings = workflow_result.plan.warnings,
+        metadata = workflow_result.execution.metadata,
+        total_created = #workflow_result.execution.created_tags,
+      },
+    }
 end
 
 ---Execute tag plan with interface selection

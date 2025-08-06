@@ -344,6 +344,223 @@ describe("tag_mapper", function()
     end)
   end)
 
+  describe("resolve_tags_for_project (New Batch API)", function()
+    describe("enhanced return format", function()
+      it("should return resolved tags and operation details", function()
+        local resources = {
+          { id = "vim", tag = 2 },
+          { id = "browser", tag = "editor" },
+        }
+        local success, result =
+          tag_mapper.resolve_tags_for_project(resources, 3, mock_interface)
+
+        assert.is_true(success)
+        assert.is_not_nil(result.resolved_tags)
+        assert.is_not_nil(result.tag_operations)
+
+        -- Check resolved tags for spawning
+        assert.equals(5, result.resolved_tags.vim.index) -- base 3 + offset 2
+        assert.equals("editor", result.resolved_tags.browser.name)
+
+        -- Check operation details for user feedback
+        assert.is_table(result.tag_operations.created_tags)
+        assert.is_table(result.tag_operations.assignments)
+        assert.is_table(result.tag_operations.warnings)
+        assert.is_number(result.tag_operations.total_created)
+      end)
+
+      it("should handle mixed tag types in batch", function()
+        local resources = {
+          { id = "relative_tag", tag = 1 }, -- relative: base + 1
+          { id = "absolute_tag", tag = "7" }, -- absolute: tag 7
+          { id = "named_tag", tag = "project" }, -- named: create new
+          { id = "existing_tag", tag = "test" }, -- named: existing
+        }
+        local success, result =
+          tag_mapper.resolve_tags_for_project(resources, 4, mock_interface)
+
+        assert.is_true(success)
+
+        -- Verify resolved tags
+        assert.equals(5, result.resolved_tags.relative_tag.index) -- 4 + 1
+        assert.equals(7, result.resolved_tags.absolute_tag.index)
+        assert.equals("project", result.resolved_tags.named_tag.name)
+        assert.equals("test", result.resolved_tags.existing_tag.name)
+        assert.equals(2, result.resolved_tags.existing_tag.index) -- from mock
+
+        -- Verify operation details
+        assert.is_table(result.tag_operations.assignments)
+        assert.equals(4, #result.tag_operations.assignments) -- 4 resources
+      end)
+
+      it("should optimize duplicate named tag creation", function()
+        local resources = {
+          { id = "app1", tag = "shared_workspace" },
+          { id = "app2", tag = "shared_workspace" },
+          { id = "app3", tag = "shared_workspace" },
+        }
+        local success, result =
+          tag_mapper.resolve_tags_for_project(resources, 2, mock_interface)
+
+        assert.is_true(success)
+
+        -- All should resolve to the same tag
+        local shared_tag = result.resolved_tags.app1
+        assert.equals(shared_tag.name, result.resolved_tags.app2.name)
+        assert.equals(shared_tag.name, result.resolved_tags.app3.name)
+
+        -- Should only create tag once
+        assert.equals(1, result.tag_operations.total_created)
+      end)
+    end)
+
+    describe("error handling", function()
+      it(
+        "should return false and error message on tag creation failure",
+        function()
+          -- Create a failing mock interface
+          local failing_interface = {
+            get_screen_context = function()
+              return {
+                screen = { index = 1 },
+                current_tag_index = 3,
+                available_tags = {},
+                tag_count = 0,
+              }
+            end,
+            create_named_tag = function(name)
+              return nil
+            end, -- Simulate failure
+            find_tag_by_name = function(name)
+              return nil
+            end,
+          }
+
+          local resources = { { id = "test", tag = "failing_tag" } }
+          local success, error_msg =
+            tag_mapper.resolve_tags_for_project(resources, 3, failing_interface)
+
+          assert.is_false(success)
+          assert.is_string(error_msg)
+          assert.matches("Tag creation failed", error_msg)
+        end
+      )
+
+      it("should handle interface validation errors", function()
+        local resources = { { id = "test", tag = 2 } }
+        local success, error_msg =
+          tag_mapper.resolve_tags_for_project(resources, 3, nil)
+
+        assert.is_false(success)
+        assert.is_string(error_msg)
+        assert.matches("interface is required", error_msg)
+      end)
+
+      it("should handle empty resources list", function()
+        local success, result =
+          tag_mapper.resolve_tags_for_project({}, 3, mock_interface)
+
+        assert.is_true(success)
+        assert.is_table(result.resolved_tags)
+        assert.is_table(result.tag_operations)
+        assert.equals(0, result.tag_operations.total_created)
+      end)
+    end)
+  end)
+
+  describe("resolve_tag backward compatibility (Phase 2)", function()
+    it("should work exactly as before after refactor", function()
+      -- Test various scenarios that must continue working
+      local test_cases = {
+        { tag_spec = 2, base_tag = 3, expected_index = 5 }, -- relative
+        { tag_spec = "7", base_tag = 2, expected_index = 7 }, -- absolute
+        {
+          tag_spec = "test",
+          base_tag = 3,
+          expected_name = "test",
+          expected_index = 2,
+        }, -- existing named
+        { tag_spec = "new_tag", base_tag = 3, expected_name = "new_tag" }, -- new named
+      }
+
+      for _, test_case in ipairs(test_cases) do
+        local success, tag = tag_mapper.resolve_tag(
+          test_case.tag_spec,
+          test_case.base_tag,
+          mock_interface
+        )
+        assert.is_true(
+          success,
+          "resolve_tag should succeed for " .. tostring(test_case.tag_spec)
+        )
+        assert.is_table(tag, "resolve_tag should return tag object")
+
+        if test_case.expected_index then
+          assert.equals(test_case.expected_index, tag.index)
+        end
+
+        if test_case.expected_name then
+          assert.equals(test_case.expected_name, tag.name)
+        end
+      end
+    end)
+
+    it("should handle errors the same way after refactor", function()
+      -- Test error scenarios that must continue working
+      local error_cases = {
+        {
+          tag_spec = nil,
+          base_tag = 3,
+          expected_error = "tag spec is required",
+        },
+        {
+          tag_spec = 2,
+          base_tag = nil,
+          expected_error = "base tag is required",
+        },
+        {
+          tag_spec = 2,
+          base_tag = "invalid",
+          expected_error = "base tag must be a number",
+        },
+      }
+
+      for _, test_case in ipairs(error_cases) do
+        local success, error = tag_mapper.resolve_tag(
+          test_case.tag_spec,
+          test_case.base_tag,
+          mock_interface
+        )
+        assert.is_false(success, "resolve_tag should fail for invalid input")
+        assert.is_string(error, "resolve_tag should return error message")
+        assert.matches(test_case.expected_error, error)
+      end
+    end)
+
+    it("should maintain exact same return format after refactor", function()
+      -- Verify the return objects have the same structure
+      local success, tag = tag_mapper.resolve_tag(1, 3, mock_interface)
+
+      assert.is_true(success)
+      assert.is_table(tag)
+      assert.is_number(tag.index)
+      assert.is_string(tag.name)
+
+      -- Verify no extra fields were added
+      local expected_fields = { "index", "name" }
+      for field_name, _ in pairs(tag) do
+        local found = false
+        for _, expected in ipairs(expected_fields) do
+          if field_name == expected then
+            found = true
+            break
+          end
+        end
+        assert.is_true(found, "Unexpected field in tag object: " .. field_name)
+      end
+    end)
+  end)
+
   describe("DSL compatibility wrappers", function()
     describe("validate_tag_spec", function()
       it("should validate valid numeric tag specs", function()

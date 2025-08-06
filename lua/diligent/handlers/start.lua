@@ -27,18 +27,48 @@ function start_handler.create(awe_module)
     -- Get current tag index using tag_mapper
     local current_tag_index = tag_mapper.get_current_tag(interface)
 
-    -- Phase 1: Sequential processing of resources
+    -- Transform resources to match tag_mapper expected format (id, tag)
+    local tag_mapper_resources = {}
     for _, resource in ipairs(payload.resources or {}) do
-      -- Resolve tag specification to actual tag object
-      local tag_success, resolved_tag =
-        tag_mapper.resolve_tag(resource.tag_spec, current_tag_index, interface)
+      table.insert(tag_mapper_resources, {
+        id = resource.name, -- tag_mapper uses 'id' field
+        tag = resource.tag_spec, -- tag_mapper uses 'tag' field
+      })
+    end
 
-      if not tag_success then
-        -- Tag resolution failed - return error immediately
+    -- Batch tag resolution for all resources at once
+    local tag_success, tag_result = tag_mapper.resolve_tags_for_project(
+      tag_mapper_resources,
+      current_tag_index,
+      interface
+    )
+
+    if not tag_success then
+      -- Tag resolution failed - return error immediately
+      -- For backward compatibility, if there's only one resource, include failed_resource
+      local failed_resource = nil
+      if #payload.resources == 1 then
+        failed_resource = payload.resources[1].name
+      end
+
+      return false,
+        {
+          error = "Tag resolution failed: " .. (tag_result or "unknown error"),
+          failed_resource = failed_resource,
+          project_name = payload.project_name,
+        }
+    end
+
+    -- Process each resource for spawning using the resolved tags
+    for _, resource in ipairs(payload.resources or {}) do
+      local resolved_tag = tag_result.resolved_tags[resource.name]
+
+      if not resolved_tag then
+        -- This shouldn't happen with proper tag_mapper implementation
         return false,
           {
-            error = "Tag resolution failed: "
-              .. (resolved_tag or "unknown error"),
+            error = "Internal error: no resolved tag for resource "
+              .. resource.name,
             failed_resource = resource.name,
             project_name = payload.project_name,
           }
@@ -63,7 +93,7 @@ function start_handler.create(awe_module)
           tag_spec = resource.tag_spec,
         })
       else
-        -- Failure - return error immediately (fail-fast for Phase 1)
+        -- Failure - return error immediately (fail-fast)
         return false,
           {
             error = message or "Unknown spawn failure",
@@ -78,6 +108,7 @@ function start_handler.create(awe_module)
         project_name = payload.project_name,
         spawned_resources = spawned_resources,
         total_spawned = #spawned_resources,
+        tag_operations = tag_result.tag_operations,
       }
   end
 

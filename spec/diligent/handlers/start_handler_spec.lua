@@ -3,11 +3,18 @@ local assert = require("luassert")
 describe("Start Handler", function()
   local start_handler
   local awe
+  local mock_interface
 
   setup(function()
     _G._TEST = true
+    mock_interface = require("awe.interfaces.mock_interface")
     start_handler = require("diligent.handlers.start")
-    awe = require("awe")
+    awe = require("awe").create(mock_interface)
+    handler = start_handler.create(awe)
+  end)
+
+  before_each(function()
+    mock_interface.reset()
   end)
 
   teardown(function()
@@ -63,17 +70,12 @@ describe("Start Handler", function()
 
   describe("create", function()
     it("should create handler with execute function", function()
-      local mock_awe = awe.create(awe.interfaces.mock_interface)
-      local handler = start_handler.create(mock_awe)
 
       assert.is_table(handler)
       assert.is_function(handler.execute)
     end)
 
     it("should create handler with validator function", function()
-      local mock_awe = awe.create(awe.interfaces.mock_interface)
-      local handler = start_handler.create(mock_awe)
-
       assert.is_table(handler.validator)
       assert.is_function(handler.validator.validate)
     end)
@@ -93,9 +95,6 @@ describe("Start Handler", function()
       }
 
       -- Create mock awe with successful spawn response
-      local mock_awe = awe.create(awe.interfaces.mock_interface)
-      local handler = start_handler.create(mock_awe)
-
       local result = assert.success(handler.execute(payload))
 
       assert.are.equal("test-project", result.project_name)
@@ -119,23 +118,12 @@ describe("Start Handler", function()
         },
       }
 
-      -- Create custom mock that fails spawning
-      local failing_interface = {
-        spawn = function(cmd, props)
-          return "ERROR: Command not found" -- String return indicates error
-        end,
-        screen = awe.interfaces.mock_interface.screen,
-        tag = awe.interfaces.mock_interface.tag,
-        get_screen_context = awe.interfaces.mock_interface.get_screen_context,
-      }
-      local mock_awe = awe.create(failing_interface)
-      local handler = start_handler.create(mock_awe)
-      local success, result = handler.execute(payload)
+      mock_interface.set_spawn_config({ success = false, error = "Error: Command not found" })
+      local error = assert.no.success(handler.execute(payload))
 
-      assert.is_false(success)
-      assert.matches("Command not found", result.error)
-      assert.are.equal("invalid", result.failed_resource)
-      assert.are.equal("test-project", result.project_name)
+      assert.matches("Command not found", error.error)
+      assert.are.equal("invalid", error.failed_resource)
+      assert.are.equal("test-project", error.project_name)
     end)
 
     it("should spawn multiple resources sequentially", function()
@@ -155,11 +143,8 @@ describe("Start Handler", function()
         },
       }
 
-      local mock_awe = awe.create(awe.interfaces.mock_interface)
-      local handler = start_handler.create(mock_awe)
-      local success, result = handler.execute(payload)
+      local result = assert.success(handler.execute(payload))
 
-      assert.is_true(success)
       assert.are.equal("multi-app", result.project_name)
       assert.are.equal(2, #result.spawned_resources)
       assert.are.equal(2, result.total_spawned)
@@ -184,30 +169,11 @@ describe("Start Handler", function()
           },
           {
             name = "bad-app",
-            command = "nonexistent",
+            command = "fail_spawn", -- Magic command that fails in mock_interface
             tag_spec = "1",
           },
         },
       }
-
-      -- Create interface that fails on second spawn
-      local call_count = 0
-      local failing_interface = {
-        spawn = function(cmd, props)
-          call_count = call_count + 1
-          if call_count == 1 then
-            return 1234, "snid-123" -- Success for first call
-          else
-            return "ERROR: Command not found" -- Fail for second call
-          end
-        end,
-        screen = awe.interfaces.mock_interface.screen,
-        tag = awe.interfaces.mock_interface.tag,
-        get_screen_context = awe.interfaces.mock_interface.get_screen_context,
-      }
-
-      local mock_awe = awe.create(failing_interface)
-      local handler = start_handler.create(mock_awe)
 
       local error = assert.no.success(handler.execute(payload))
       assert.are.equal("bad-app", error.failed_resource)
@@ -228,11 +194,8 @@ describe("Start Handler", function()
         },
       }
 
-      local mock_awe = awe.create(awe.interfaces.mock_interface)
-      local handler = start_handler.create(mock_awe)
-      local success, result = handler.execute(payload)
+      local result = assert.success(handler.execute(payload))
 
-      assert.is_true(success)
       assert.are.equal(1, result.total_spawned)
     end)
 
@@ -242,8 +205,6 @@ describe("Start Handler", function()
         resources = {},
       }
 
-      local mock_awe = awe.create(awe.interfaces.mock_interface)
-      local handler = start_handler.create(mock_awe)
       local success, result = handler.execute(payload)
 
       assert.is_true(success)
@@ -254,12 +215,10 @@ describe("Start Handler", function()
   end)
 
   describe("tag resolution with tag_mapper", function()
-    local mock_interface
     local original_tag_mapper
     local original_start_handler
 
     before_each(function()
-      mock_interface = require("awe.interfaces.mock_interface")
       mock_interface.reset()
 
       -- Mock tag_mapper to control tag resolution behavior
@@ -299,6 +258,57 @@ describe("Start Handler", function()
           local screen_context = interface.get_screen_context()
           return screen_context.current_tag_index or 1
         end,
+        resolve_tags_for_project = function(resources, base_tag, interface)
+          -- Mock batch tag resolution - transform to individual calls
+          local resolved_tags = {}
+          local created_tags_map = {} -- Use map to avoid duplicates
+          local assignments = {}
+
+          for _, resource in ipairs(resources) do
+            -- Use the existing resolve_tag mock logic
+            local success, tag = package.loaded["tag_mapper"].resolve_tag(
+              resource.tag,
+              base_tag,
+              interface
+            )
+            if success then
+              resolved_tags[resource.id] = tag
+              table.insert(assignments, {
+                resource_id = resource.id,
+                type = type(resource.tag) == "string" and "named" or "relative",
+                resolved_index = tag.index,
+                name = tag.name,
+              })
+              -- Mock tag creation for named tags (avoid duplicates)
+              if
+                type(resource.tag) == "string" and not tonumber(resource.tag)
+              then
+                created_tags_map[resource.tag] =
+                  { name = resource.tag, tag = tag }
+              end
+            else
+              return false, "Tag creation failed: " .. tostring(tag)
+            end
+          end
+
+          -- Convert map to array
+          local created_tags = {}
+          for _, tag_info in pairs(created_tags_map) do
+            table.insert(created_tags, tag_info)
+          end
+
+          return true,
+            {
+              resolved_tags = resolved_tags,
+              tag_operations = {
+                created_tags = created_tags,
+                assignments = assignments,
+                warnings = {},
+                metadata = { overall_status = "success" },
+                total_created = #created_tags,
+              },
+            }
+        end,
       }
 
       -- Force start_handler to reload with mocked tag_mapper
@@ -327,9 +337,6 @@ describe("Start Handler", function()
           },
         },
       }
-
-      local mock_awe = awe.create(mock_interface)
-      local handler = start_handler.create(mock_awe)
 
       local success, result = handler.execute(payload)
 
@@ -362,9 +369,6 @@ describe("Start Handler", function()
         },
       }
 
-      local mock_awe = awe.create(mock_interface)
-      local handler = start_handler.create(mock_awe)
-
       local success, result = handler.execute(payload)
 
       assert.is_true(success, "Handler execution should succeed")
@@ -390,9 +394,6 @@ describe("Start Handler", function()
           },
         },
       }
-
-      local mock_awe = awe.create(mock_interface)
-      local handler = start_handler.create(mock_awe)
 
       local success, result = handler.execute(payload)
 
@@ -432,9 +433,6 @@ describe("Start Handler", function()
         },
       }
 
-      local mock_awe = awe.create(mock_interface)
-      local handler = start_handler.create(mock_awe)
-
       local success, result = handler.execute(payload)
 
       -- Restore original tag_mapper
@@ -447,10 +445,7 @@ describe("Start Handler", function()
   end)
 
   describe("tag resolution via tag_mapper", function()
-    local mock_interface
-
     before_each(function()
-      mock_interface = require("awe.interfaces.mock_interface")
       mock_interface.reset()
     end)
 
@@ -493,8 +488,6 @@ describe("Start Handler", function()
           "Offset should be 2, got: " .. tostring(arandr_request.tag_spec)
         ) -- Relative +2 offset
 
-        local mock_awe = awe.create(mock_interface)
-        local handler = start_handler.create(mock_awe)
         local success, result = handler.execute(start_request)
 
         if not success then
@@ -532,8 +525,6 @@ describe("Start Handler", function()
         },
       }
 
-      local mock_awe = awe.create(mock_interface)
-      local handler = start_handler.create(mock_awe)
       local success, result = handler.execute(payload)
 
       assert.is_true(success)
@@ -558,9 +549,6 @@ describe("Start Handler", function()
             },
           },
         }
-
-        local mock_awe = awe.create(mock_interface)
-        local handler = start_handler.create(mock_awe)
 
         -- Execute and capture the spawn call
         local success, result = handler.execute(payload)
@@ -601,8 +589,6 @@ describe("Start Handler", function()
           },
         }
 
-        local mock_awe = awe.create(mock_interface)
-        local handler = start_handler.create(mock_awe)
         local success, result = handler.execute(payload)
 
         assert.is_true(success)
@@ -632,5 +618,91 @@ describe("Start Handler", function()
         )
       end
     )
+
+    describe("batch tag processing (Phase 3)", function()
+      it("should include tag operations in response", function()
+        local payload = {
+          project_name = "batch-test",
+          resources = {
+            { name = "vim", command = "vim", tag_spec = 2 },
+            { name = "browser", command = "firefox", tag_spec = "editor" },
+          },
+        }
+
+        local success, result = handler.execute(payload)
+        assert.is_true(success, "Handler execution should succeed")
+
+        -- Verify existing fields still exist
+        assert.equals("batch-test", result.project_name)
+        assert.is_table(result.spawned_resources)
+        assert.is_number(result.total_spawned)
+
+        -- Verify new tag_operations field exists
+        assert.is_table(
+          result.tag_operations,
+          "Should include tag_operations in response"
+        )
+        assert.is_table(
+          result.tag_operations.created_tags,
+          "Should include created_tags info"
+        )
+        assert.is_table(
+          result.tag_operations.assignments,
+          "Should include assignments info"
+        )
+        assert.is_table(
+          result.tag_operations.warnings,
+          "Should include warnings info"
+        )
+        assert.is_number(
+          result.tag_operations.total_created,
+          "Should include total_created count"
+        )
+
+        -- Verify tag operations contain meaningful data
+        assert.equals(2, #result.tag_operations.assignments) -- 2 resources
+        assert.equals(1, result.tag_operations.total_created) -- 1 new tag created ("editor")
+      end)
+
+      it("should handle batch tag creation efficiently", function()
+        local payload = {
+          project_name = "efficiency-test",
+          resources = {
+            { name = "app1", command = "cmd1", tag_spec = "shared_workspace" },
+            { name = "app2", command = "cmd2", tag_spec = "shared_workspace" },
+            { name = "app3", command = "cmd3", tag_spec = "shared_workspace" },
+          },
+        }
+
+        local success, result = handler.execute(payload)
+        assert.is_true(success)
+
+        -- Should only create the tag once despite 3 resources needing it
+        assert.equals(1, result.tag_operations.total_created)
+        assert.equals(3, #result.tag_operations.assignments)
+
+        -- All resources should spawn successfully
+        assert.equals(3, result.total_spawned)
+        assert.equals(3, #result.spawned_resources)
+      end)
+
+      it("should handle tag creation failures gracefully", function()
+        local payload = {
+          project_name = "tag-fail-test",
+          resources = {
+            {
+              name = "test-app",
+              command = "test-cmd",
+              tag_spec = "fail_tag_creation", -- Named tag that will fail
+            },
+          },
+        }
+
+        local result = assert.no.success(handler.execute(payload))
+        assert.is_string(result.error)
+        assert.matches("Tag creation failed", result.error)
+        assert.equals("tag-fail-test", result.project_name)
+      end)
+    end)
   end)
 end)

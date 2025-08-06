@@ -95,6 +95,11 @@ function mock_interface.create_named_tag(name, screen)
     return nil
   end
 
+  -- magic name for failing tag creation
+  if name == "fail_tag_creation" then
+    return nil
+  end
+
   -- Return mock tag object
   return { name = name, index = 2 }
 end
@@ -150,6 +155,10 @@ function mock_interface.spawn(command, properties)
   -- Store the spawn call in history
   table.insert(mock_data.spawn_calls, spawn_call)
 
+  if command == "fail_spawn" then
+    return "Error: Command not found"
+  end
+
   if mock_data.spawn_config.success then
     return mock_data.spawn_config.pid, mock_data.spawn_config.snid
   else
@@ -166,6 +175,7 @@ end
 
 ---Set spawn configuration for testing
 ---@param config table Spawn configuration {success=bool, pid=number, snid=string, error=string}
+---@example mock.interface.set_spawn_config({ success = false, error = "Error: Command not found" })
 function mock_interface.set_spawn_config(config)
   mock_data.spawn_config = config
     or {
@@ -204,7 +214,7 @@ function mock_interface.set_current_tag_index(index)
 end
 
 --Set the screen context for testing
----@return table|nil spawn_call Table, or nil to set up a failing screen context
+--@return table|nil spawn_call Table, or nil to set up a failing screen context
 function mock_interface.set_screen_context(screen_context)
   mock_data.screen_context = screen_context or "mock-failing-screen"
 end
