@@ -163,7 +163,7 @@ end
 
 ---Resolve tags for project resources
 ---High-level coordinator that handles the complete workflow
----@param resources table List of resource objects with id and tag fields
+---@param resources table List of resource objects with name and tag_spec fields
 ---@param base_tag number Current base tag index for relative calculations
 ---@param interface table Interface object (awesome_interface or dry_run_interface)
 ---@return table results Complete workflow results with plan and execution

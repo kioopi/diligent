@@ -83,7 +83,7 @@ function tag_mapper.resolve_tag(tag_spec, base_tag, interface)
   end
 
   -- Use new batch architecture internally for consistency
-  local resources = { { id = "single", tag = tag_spec } }
+  local resources = { { name = "single", tag_spec = tag_spec } }
   local success, result =
     tag_mapper.resolve_tags_for_project(resources, base_tag, interface)
 
@@ -136,7 +136,7 @@ end
 -- New high-level API functions using integration layer
 
 ---Resolve tags for project with enhanced return format for start handler
----@param resources table List of resource objects with id and tag fields
+---@param resources table List of resource objects with name and tag_spec fields
 ---@param base_tag number Current base tag index for relative calculations
 ---@param interface table Interface implementation (required)
 ---@return boolean success True if successful, false on error

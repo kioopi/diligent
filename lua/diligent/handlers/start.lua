@@ -150,18 +150,9 @@ function start_handler.create(awe_module)
     -- Get current tag index using tag_mapper
     local current_tag_index = tag_mapper.get_current_tag(interface)
 
-    -- Transform resources to match tag_mapper expected format (id, tag)
-    local tag_mapper_resources = {}
-    for _, resource in ipairs(payload.resources or {}) do
-      table.insert(tag_mapper_resources, {
-        id = resource.name, -- tag_mapper uses 'id' field
-        tag = resource.tag_spec, -- tag_mapper uses 'tag' field
-      })
-    end
-
-    -- Batch tag resolution for all resources at once
+    -- Batch tag resolution for all resources at once (no transformation needed)
     local tag_success, tag_result = tag_mapper.resolve_tags_for_project(
-      tag_mapper_resources,
+      payload.resources,
       current_tag_index,
       interface
     )

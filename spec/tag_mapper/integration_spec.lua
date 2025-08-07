@@ -272,16 +272,16 @@ describe("tag_mapper.integration", function()
     before_each(function()
       mock_resources = {
         {
-          id = "editor_app",
-          tag = "editor",
+          name = "editor_app",
+          tag_spec = "editor",
         },
         {
-          id = "terminal",
-          tag = 1,
+          name = "terminal",
+          tag_spec = 1,
         },
         {
-          id = "browser",
-          tag = "5",
+          name = "browser",
+          tag_spec = "5",
         },
       }
     end)
@@ -335,8 +335,8 @@ describe("tag_mapper.integration", function()
     it("should return comprehensive results with warnings", function()
       -- Add a resource that will cause overflow
       table.insert(mock_resources, {
-        id = "overflow_app",
-        tag = 15, -- will overflow to tag 9
+        name = "overflow_app",
+        tag_spec = 15, -- will overflow to tag 9
       })
 
       local results = integration.resolve_tags_for_project(
@@ -393,8 +393,8 @@ describe("tag_mapper.integration", function()
           -- Mock resources that will cause core planning to fail
           local problem_resources = {
             {
-              id = "invalid_resource",
-              tag = function() end, -- Invalid tag type that should cause core to return error
+              name = "invalid_resource",
+              tag_spec = function() end, -- Invalid tag type that should cause core to return error
             },
           }
 
@@ -432,8 +432,8 @@ describe("tag_mapper.integration", function()
 
           -- Resources that require tag creation (will fail in execution)
           local creation_resources = {
-            { id = "editor", tag = "editor_workspace" },
-            { id = "browser", tag = "browser_workspace" },
+            { name = "editor", tag_spec = "editor_workspace" },
+            { name = "browser", tag_spec = "browser_workspace" },
           }
 
           local result, error_obj = integration.resolve_tags_for_project(
@@ -465,7 +465,7 @@ describe("tag_mapper.integration", function()
       "should work with both awesome_interface and dry_run_interface",
       function()
         local mock_resources = {
-          { id = "test_app", tag = "test_tag" },
+          { name = "test_app", tag_spec = "test_tag" },
         }
 
         -- Test with dry-run interface

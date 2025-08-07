@@ -203,7 +203,7 @@ end
 
 ---Plan tag operations for a list of resources
 ---Takes resources and screen context, returns structured operation plan
----@param resources table List of resource objects with id and tag fields
+---@param resources table List of resource objects with name and tag_spec fields
 ---@param screen_context table Screen context with available tags and metadata
 ---@param base_tag number Current base tag index for relative calculations
 ---@return boolean success True if planning succeeded
@@ -254,11 +254,11 @@ function tag_mapper_core.plan_tag_operations(
 
   -- Process each resource
   for _, resource in ipairs(resources) do
-    if resource.id and resource.tag ~= nil then
+    if resource.name and resource.tag_spec ~= nil then
       -- Resolve tag specification for this resource
       local success, result, _metadata =
         tag_mapper_core.resolve_tag_specification(
-          resource.tag,
+          resource.tag_spec,
           base_tag,
           screen_context
         )
@@ -267,7 +267,7 @@ function tag_mapper_core.plan_tag_operations(
         local resolution = result
         -- Create assignment entry
         local assignment = {
-          resource_id = resource.id,
+          resource_id = resource.name,
           type = resolution.type,
           resolved_index = resolution.resolved_index,
           name = resolution.name,
@@ -282,7 +282,7 @@ function tag_mapper_core.plan_tag_operations(
         if resolution.overflow then
           table.insert(plan.warnings, {
             type = "overflow",
-            resource_id = resource.id,
+            resource_id = resource.name,
             original_index = resolution.original_index,
             final_index = resolution.resolved_index,
           })
@@ -295,7 +295,7 @@ function tag_mapper_core.plan_tag_operations(
       else
         -- Handle individual resource error
         local error_obj = result
-        error_obj.resource_id = resource.id -- Add resource context
+        error_obj.resource_id = resource.name -- Add resource context
         table.insert(resource_errors, error_obj)
         -- Continue processing other resources
       end

@@ -348,8 +348,8 @@ describe("tag_mapper", function()
     describe("enhanced return format", function()
       it("should return resolved tags and operation details", function()
         local resources = {
-          { id = "vim", tag = 2 },
-          { id = "browser", tag = "editor" },
+          { name = "vim", tag_spec = 2 },
+          { name = "browser", tag_spec = "editor" },
         }
         local success, result =
           tag_mapper.resolve_tags_for_project(resources, 3, mock_interface)
@@ -371,10 +371,10 @@ describe("tag_mapper", function()
 
       it("should handle mixed tag types in batch", function()
         local resources = {
-          { id = "relative_tag", tag = 1 }, -- relative: base + 1
-          { id = "absolute_tag", tag = "7" }, -- absolute: tag 7
-          { id = "named_tag", tag = "project" }, -- named: create new
-          { id = "existing_tag", tag = "test" }, -- named: existing
+          { name = "relative_tag", tag_spec = 1 }, -- relative: base + 1
+          { name = "absolute_tag", tag_spec = "7" }, -- absolute: tag 7
+          { name = "named_tag", tag_spec = "project" }, -- named: create new
+          { name = "existing_tag", tag_spec = "test" }, -- named: existing
         }
         local success, result =
           tag_mapper.resolve_tags_for_project(resources, 4, mock_interface)
@@ -395,9 +395,9 @@ describe("tag_mapper", function()
 
       it("should optimize duplicate named tag creation", function()
         local resources = {
-          { id = "app1", tag = "shared_workspace" },
-          { id = "app2", tag = "shared_workspace" },
-          { id = "app3", tag = "shared_workspace" },
+          { name = "app1", tag_spec = "shared_workspace" },
+          { name = "app2", tag_spec = "shared_workspace" },
+          { name = "app3", tag_spec = "shared_workspace" },
         }
         local success, result =
           tag_mapper.resolve_tags_for_project(resources, 2, mock_interface)
@@ -436,17 +436,20 @@ describe("tag_mapper", function()
             end,
           }
 
-          local resources = { { id = "test", tag = "failing_tag" } }
+          local resources = { { name = "test", tag_spec = "failing_tag" } }
           local error = assert.no.success(
             tag_mapper.resolve_tags_for_project(resources, 3, failing_interface)
           )
 
-          assert.matches("Tag creation failed: failed to create tag: failing_tag", error.message)
+          assert.matches(
+            "Tag creation failed: failed to create tag: failing_tag",
+            error.message
+          )
         end
       )
 
       it("should handle interface validation errors", function()
-        local resources = { { id = "test", tag = 2 } }
+        local resources = { { name = "test", tag_spec = 2 } }
         local success, error_msg =
           tag_mapper.resolve_tags_for_project(resources, 3, nil)
 

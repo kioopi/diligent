@@ -279,17 +279,10 @@ describe("Start Handler", function()
           local interface = awe.interface
           local current_tag_index = mock_tag_mapper.get_current_tag(interface)
 
-          local tag_mapper_resources = {}
-          for _, resource in ipairs(payload.resources or {}) do
-            table.insert(tag_mapper_resources, {
-              id = resource.name,
-              tag = resource.tag_spec,
-            })
-          end
-
+          -- No transformation needed - pass resources directly
           local tag_success, tag_result =
             mock_tag_mapper.resolve_tags_for_project(
-              tag_mapper_resources,
+              payload.resources,
               current_tag_index,
               interface
             )
