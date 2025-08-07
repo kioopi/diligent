@@ -25,7 +25,7 @@ function start_handler.create(awe_module)
     local success_count = 0
     local error_count = 0
     local total_attempted = #resources
-    
+
     -- Handle different error object types
     if error_obj.type == "MULTIPLE_TAG_ERRORS" then
       -- Multiple tag errors with potential partial success
@@ -34,17 +34,21 @@ function start_handler.create(awe_module)
           table.insert(errors, {
             phase = "tag_resolution",
             resource_id = err.resource_id,
-            error = err
+            error = err,
           })
           error_count = error_count + 1
         end
       end
-      
+
       -- Check for partial success data
-      if error_obj.partial_success and error_obj.partial_success.resolved_tags then
+      if
+        error_obj.partial_success and error_obj.partial_success.resolved_tags
+      then
         local spawned_resources = {}
         -- Try to spawn successfully resolved resources
-        for resource_name, resolved_tag in pairs(error_obj.partial_success.resolved_tags) do
+        for resource_name, resolved_tag in
+          pairs(error_obj.partial_success.resolved_tags)
+        do
           -- Find the original resource config
           local original_resource = nil
           for _, res in ipairs(resources) do
@@ -53,17 +57,18 @@ function start_handler.create(awe_module)
               break
             end
           end
-          
+
           if original_resource then
-            local pid, snid, message = awe_module.spawn.spawner.spawn_with_properties(
-              original_resource.command,
-              resolved_tag,
-              {
-                working_dir = original_resource.working_dir,
-                reuse = original_resource.reuse,
-              }
-            )
-            
+            local pid, snid, message =
+              awe_module.spawn.spawner.spawn_with_properties(
+                original_resource.command,
+                resolved_tag,
+                {
+                  working_dir = original_resource.working_dir,
+                  reuse = original_resource.reuse,
+                }
+              )
+
             if pid and type(pid) == "number" then
               table.insert(spawned_resources, {
                 name = original_resource.name,
@@ -81,48 +86,58 @@ function start_handler.create(awe_module)
                 error = {
                   type = "SPAWN_FAILURE",
                   message = message or "Unknown spawn failure",
-                  context = { command = original_resource.command }
-                }
+                  context = { command = original_resource.command },
+                },
               })
               error_count = error_count + 1
             end
           end
         end
-        
+
         if #spawned_resources > 0 then
           partial_success = {
             spawned_resources = spawned_resources,
-            total_spawned = #spawned_resources
+            total_spawned = #spawned_resources,
           }
         end
       end
     else
-      -- Single error case - but this may be from a single resource, so still complete failure for that resource
+      -- Single error case - determine phase from error metadata or type
+      local phase = "tag_resolution" -- default
+      if
+        (error_obj.metadata and error_obj.metadata.phase == "spawning")
+        or error_obj.type == "SPAWN_FAILURE"
+      then
+        phase = "spawning"
+      end
+
       table.insert(errors, {
-        phase = "tag_resolution", 
-        resource_id = error_obj.resource_id or (resources[1] and resources[1].name),
-        error = error_obj
+        phase = phase,
+        resource_id = error_obj.resource_id
+          or (resources[1] and resources[1].name),
+        error = error_obj,
       })
       error_count = 1
     end
-    
-    local error_type = success_count > 0 and "PARTIAL_FAILURE" or "COMPLETE_FAILURE"
-    
+
+    local error_type = success_count > 0 and "PARTIAL_FAILURE"
+      or "COMPLETE_FAILURE"
+
     local response = {
       project_name = project_name,
       error_type = error_type,
       errors = errors,
       metadata = {
         total_attempted = total_attempted,
-        success_count = success_count, 
-        error_count = error_count
-      }
+        success_count = success_count,
+        error_count = error_count,
+      },
     }
-    
+
     if partial_success then
       response.partial_success = partial_success
     end
-    
+
     return false, response
   end
 
@@ -152,22 +167,31 @@ function start_handler.create(awe_module)
     )
 
     if not tag_success then
-      -- Tag resolution failed - check if we need backwards compatibility
+      -- Tag resolution failed - always use enhanced format
+      -- Convert string errors to structured error objects if needed
       if tag_result and type(tag_result) == "string" then
-        -- Old string error format - maintain backwards compatibility
-        local failed_resource = nil
-        if #payload.resources == 1 then
-          failed_resource = payload.resources[1].name
-        end
-        return false, {
-          error = "Tag resolution failed: " .. tag_result,
-          failed_resource = failed_resource,
-          project_name = payload.project_name,
+        -- Convert old string format to structured error object
+        local error_obj = {
+          type = "TAG_RESOLUTION_ERROR",
+          category = "validation",
+          resource_id = #payload.resources == 1 and payload.resources[1].name
+            or nil,
+          message = tag_result,
+          context = {},
+          suggestions = {},
+          metadata = {
+            timestamp = os.time(),
+            phase = "planning",
+          },
         }
-      else
-        -- New structured error object - handle with enhanced format
-        return handler.format_error_response(payload.project_name, tag_result, payload.resources)
+        tag_result = error_obj
       end
+      -- Always use enhanced error format
+      return handler.format_error_response(
+        payload.project_name,
+        tag_result,
+        payload.resources
+      )
     end
 
     -- Process each resource for spawning using the resolved tags
@@ -184,14 +208,15 @@ function start_handler.create(awe_module)
             project_name = payload.project_name,
           }
       else
-        local pid, snid, message = awe_module.spawn.spawner.spawn_with_properties(
-          resource.command,
-          resolved_tag,
-          {
-            working_dir = resource.working_dir,
-            reuse = resource.reuse,
-          }
-        )
+        local pid, snid, message =
+          awe_module.spawn.spawner.spawn_with_properties(
+            resource.command,
+            resolved_tag,
+            {
+              working_dir = resource.working_dir,
+              reuse = resource.reuse,
+            }
+          )
 
         if pid and type(pid) == "number" then
           -- Success - add to spawned resources
@@ -203,14 +228,29 @@ function start_handler.create(awe_module)
             tag_spec = resource.tag_spec,
           })
         else
-          -- Failure - return old format for backwards compatibility in simple cases
-          -- Only use new structured format when specifically requested by tests
-          return false,
-            {
-              error = message or "Unknown spawn failure",
-              failed_resource = resource.name,
-              project_name = payload.project_name,
-            }
+          -- Failure - use enhanced error format
+          local spawn_error = {
+            type = "SPAWN_FAILURE",
+            category = "execution",
+            resource_id = resource.name,
+            message = message or "Unknown spawn failure",
+            context = { command = resource.command },
+            suggestions = {
+              "Check if '" .. resource.command .. "' is installed",
+              "Verify command name spelling",
+              "Add application directory to PATH",
+            },
+            metadata = {
+              timestamp = os.time(),
+              phase = "spawning",
+            },
+          }
+
+          return handler.format_error_response(
+            payload.project_name,
+            spawn_error,
+            payload.resources
+          )
         end
       end
     end

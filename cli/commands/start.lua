@@ -129,17 +129,18 @@ end
 -- Parse and display results using enhanced response formatter
 if response then
   local format_type = response_formatter.detect_response_format(response)
-  
+
   if format_type == "success" or (response.status == "success") then
     -- Handle success responses
-    local formatted_output = response_formatter.format_success_response(response)
+    local formatted_output =
+      response_formatter.format_success_response(response)
     print(formatted_output)
     os.exit(error_reporter.EXIT_SUCCESS)
   else
     -- Handle error responses (both simple and enhanced)
     local formatted_output = response_formatter.format_response(response)
     print(formatted_output)
-    
+
     -- Exit with appropriate error code
     os.exit(error_reporter.EXIT_VALIDATION_ERROR)
   end

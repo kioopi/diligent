@@ -156,7 +156,8 @@ function tag_mapper.resolve_tags_for_project(resources, base_tag, interface)
   end
 
   -- Use existing architecture: plan -> execute -> extract
-  local workflow_result, error_obj = integration.resolve_tags_for_project(resources, base_tag, interface)
+  local workflow_result, error_obj =
+    integration.resolve_tags_for_project(resources, base_tag, interface)
 
   if not workflow_result then
     -- Handle structured error object
