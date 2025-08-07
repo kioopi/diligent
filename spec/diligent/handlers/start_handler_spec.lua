@@ -184,18 +184,15 @@ describe("Start Handler", function()
       }
 
       local success, result = handler.execute(payload)
-      assert.is_false(
+      -- With new spawn_resources implementation, this should succeed because one resource spawns
+      assert.is_true(
         success,
-        "Handler should fail due to bad-app spawn failure"
+        "Handler should succeed because good-app spawns successfully"
       )
-      -- Now expects enhanced error format instead of backwards compatibility format
       assert.equals("partial-fail", result.project_name)
-      assert.equals("COMPLETE_FAILURE", result.error_type)
-      assert.is_table(result.errors)
-      assert.equals(1, #result.errors)
-      assert.equals("spawning", result.errors[1].phase)
-      assert.equals("bad-app", result.errors[1].resource_id)
-      assert.matches("Command not found", result.errors[1].error.message)
+      assert.equals(1, result.total_spawned) -- Only good-app spawned
+      assert.equals(1, #result.spawned_resources)
+      assert.equals("good-app", result.spawned_resources[1].name)
     end)
 
     it("should pass working directory and reuse options to spawner", function()

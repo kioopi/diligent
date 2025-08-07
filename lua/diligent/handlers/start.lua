@@ -18,6 +18,131 @@ function start_handler.create(awe_module)
     validator = start_handler.validator,
   }
 
+  -- Helper function to attempt spawning a single resource
+  local function attempt_single_spawn(resource, resolved_tag, awe_instance)
+    local pid, snid, message = awe_instance.spawn.spawner.spawn_with_properties(
+      resource.command,
+      resolved_tag,
+      {
+        working_dir = resource.working_dir,
+        reuse = resource.reuse,
+      }
+    )
+
+    if pid and type(pid) == "number" then
+      return true,
+        {
+          name = resource.name,
+          pid = pid,
+          snid = snid,
+          command = resource.command,
+          tag_spec = resource.tag_spec,
+        }
+    else
+      return false, message
+    end
+  end
+
+  -- Helper function to create a structured spawn error object
+  local function create_spawn_error(resource, message)
+    return {
+      type = "SPAWN_FAILURE",
+      category = "execution",
+      resource_id = resource.name,
+      message = message or "Unknown spawn failure",
+      context = { command = resource.command },
+      suggestions = {
+        "Check if '" .. resource.command .. "' is installed",
+        "Verify command name spelling",
+        "Add application directory to PATH",
+      },
+      metadata = {
+        timestamp = os.time(),
+        phase = "spawning",
+      },
+    }
+  end
+
+  -- Spawn resources using resolved tags
+  ---@param resolved_tags table Map of resource names to tag objects
+  ---@param resources table Original resource configurations
+  ---@param awe_module table Awe module instance for spawning
+  ---@return boolean success True if any resource spawned successfully
+  ---@return table|string result Spawned resources array on success, error message on complete failure
+  ---@return table metadata Spawn results, errors, and statistics
+  function handler.spawn_resources(resolved_tags, resources, awe_instance)
+    local spawned_resources = {}
+    local spawn_errors = {}
+    local spawn_results = {}
+    local total_attempted = #resources
+
+    -- Attempt to spawn each resource
+    for _, resource in ipairs(resources) do
+      local resolved_tag = resolved_tags[resource.name]
+
+      if not resolved_tag then
+        -- This shouldn't happen with new fallback strategy
+        local error_obj = {
+          type = "INTERNAL_ERROR",
+          message = "No resolved tag for resource: " .. resource.name,
+          resource_id = resource.name,
+          context = { resolved_tags = resolved_tags },
+        }
+        table.insert(spawn_errors, error_obj)
+        table.insert(spawn_results, {
+          resource_name = resource.name,
+          success = false,
+          error = error_obj,
+        })
+      else
+        -- Attempt spawn using helper function
+        local spawn_success, spawn_result =
+          attempt_single_spawn(resource, resolved_tag, awe_instance)
+
+        if spawn_success then
+          -- Spawn success
+          table.insert(spawned_resources, spawn_result)
+          table.insert(spawn_results, {
+            resource_name = resource.name,
+            success = true,
+            pid = spawn_result.pid,
+            snid = spawn_result.snid,
+          })
+        else
+          -- Spawn failure - create structured error
+          local spawn_error = create_spawn_error(resource, spawn_result)
+          table.insert(spawn_errors, spawn_error)
+          table.insert(spawn_results, {
+            resource_name = resource.name,
+            success = false,
+            error = spawn_error,
+          })
+        end
+      end
+    end
+
+    local metadata = {
+      total_attempted = total_attempted,
+      success_count = #spawned_resources,
+      error_count = #spawn_errors,
+      spawn_results = spawn_results,
+      errors = spawn_errors,
+    }
+
+    -- Return success if any resources spawned OR if no resources were provided (empty list)
+    if #spawned_resources > 0 or total_attempted == 0 then
+      return true, spawned_resources, metadata
+    elseif #spawn_errors > 0 then
+      -- Complete failure - create aggregated error
+      local error_reporter = require("diligent.error.reporter").create()
+      local aggregated_error = error_reporter.aggregate_errors(spawn_errors)
+      return false, aggregated_error, metadata
+    else
+      -- This shouldn't happen
+      return false, "Unexpected state in spawn_resources", metadata
+    end
+  end
+
   -- Helper function to format error responses with structured error objects
   function handler.format_error_response(project_name, error_obj, resources)
     local errors = {}
@@ -40,65 +165,44 @@ function start_handler.create(awe_module)
         end
       end
 
-      -- Check for partial success data
+      -- Check for partial success data - use spawn_resources function
       if
         error_obj.partial_success and error_obj.partial_success.resolved_tags
       then
-        local spawned_resources = {}
-        -- Try to spawn successfully resolved resources
-        for resource_name, resolved_tag in
-          pairs(error_obj.partial_success.resolved_tags)
-        do
-          -- Find the original resource config
-          local original_resource = nil
-          for _, res in ipairs(resources) do
-            if res.name == resource_name then
-              original_resource = res
-              break
-            end
-          end
-
-          if original_resource then
-            local pid, snid, message =
-              awe_module.spawn.spawner.spawn_with_properties(
-                original_resource.command,
-                resolved_tag,
-                {
-                  working_dir = original_resource.working_dir,
-                  reuse = original_resource.reuse,
-                }
-              )
-
-            if pid and type(pid) == "number" then
-              table.insert(spawned_resources, {
-                name = original_resource.name,
-                pid = pid,
-                snid = snid,
-                command = original_resource.command,
-                tag_spec = original_resource.tag_spec,
-              })
-              success_count = success_count + 1
-            else
-              -- Spawning failed even for resolved tag
-              table.insert(errors, {
-                phase = "spawning",
-                resource_id = original_resource.name,
-                error = {
-                  type = "SPAWN_FAILURE",
-                  message = message or "Unknown spawn failure",
-                  context = { command = original_resource.command },
-                },
-              })
-              error_count = error_count + 1
-            end
+        -- Filter resources to only include those with resolved tags
+        local resolved_resources = {}
+        for _, resource in ipairs(resources) do
+          if error_obj.partial_success.resolved_tags[resource.name] then
+            table.insert(resolved_resources, resource)
           end
         end
 
-        if #spawned_resources > 0 then
+        -- Use the new spawn_resources function for partial success handling
+        local spawn_success, spawned_resources, spawn_metadata =
+          handler.spawn_resources(
+            error_obj.partial_success.resolved_tags,
+            resolved_resources,
+            awe_module
+          )
+
+        if spawn_success then
           partial_success = {
             spawned_resources = spawned_resources,
             total_spawned = #spawned_resources,
           }
+          success_count = #spawned_resources
+        end
+
+        -- Add spawn errors to existing error collection (only for resources that had successful tag resolution)
+        if spawn_metadata.errors then
+          for _, spawn_err in ipairs(spawn_metadata.errors) do
+            table.insert(errors, {
+              phase = "spawning",
+              resource_id = spawn_err.resource_id,
+              error = spawn_err,
+            })
+            error_count = error_count + 1
+          end
         end
       end
     else
@@ -142,8 +246,6 @@ function start_handler.create(awe_module)
   end
 
   function handler.execute(payload)
-    local spawned_resources = {}
-
     -- Get the interface for tag_mapper (tag_mapper expects raw interface, not awe_module)
     local interface = awe_module.interface
 
@@ -166,74 +268,30 @@ function start_handler.create(awe_module)
       )
     end
 
-    -- Process each resource for spawning using the resolved tags
-    for _, resource in ipairs(payload.resources or {}) do
-      local resolved_tag = tag_result.resolved_tags[resource.name]
+    -- Use spawn_resources function to handle all spawning
+    local spawn_success, spawned_resources, _ = handler.spawn_resources(
+      tag_result.resolved_tags,
+      payload.resources,
+      awe_module
+    )
 
-      if not resolved_tag then
-        -- This shouldn't happen with proper tag_mapper implementation
-        return false,
-          {
-            error = "Internal error: no resolved tag for resource "
-              .. resource.name,
-            failed_resource = resource.name,
-            project_name = payload.project_name,
-          }
-      else
-        local pid, snid, message =
-          awe_module.spawn.spawner.spawn_with_properties(
-            resource.command,
-            resolved_tag,
-            {
-              working_dir = resource.working_dir,
-              reuse = resource.reuse,
-            }
-          )
-
-        if pid and type(pid) == "number" then
-          -- Success - add to spawned resources
-          table.insert(spawned_resources, {
-            name = resource.name,
-            pid = pid,
-            snid = snid,
-            command = resource.command,
-            tag_spec = resource.tag_spec,
-          })
-        else
-          -- Failure - use enhanced error format
-          local spawn_error = {
-            type = "SPAWN_FAILURE",
-            category = "execution",
-            resource_id = resource.name,
-            message = message or "Unknown spawn failure",
-            context = { command = resource.command },
-            suggestions = {
-              "Check if '" .. resource.command .. "' is installed",
-              "Verify command name spelling",
-              "Add application directory to PATH",
-            },
-            metadata = {
-              timestamp = os.time(),
-              phase = "spawning",
-            },
-          }
-
-          return handler.format_error_response(
-            payload.project_name,
-            spawn_error,
-            payload.resources
-          )
-        end
-      end
+    if spawn_success then
+      -- All or partial spawning success
+      return true,
+        {
+          project_name = payload.project_name,
+          spawned_resources = spawned_resources,
+          total_spawned = #spawned_resources,
+          tag_operations = tag_result.tag_operations,
+        }
+    else
+      -- Complete spawning failure - use error response formatting
+      return handler.format_error_response(
+        payload.project_name,
+        spawned_resources, -- This is the error object when spawn_success is false
+        payload.resources
+      )
     end
-
-    return true,
-      {
-        project_name = payload.project_name,
-        spawned_resources = spawned_resources,
-        total_spawned = #spawned_resources,
-        tag_operations = tag_result.tag_operations,
-      }
   end
 
   return handler

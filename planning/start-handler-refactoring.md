@@ -6,9 +6,9 @@ This plan follows strict Test-Driven Development with each step beginning with f
 
 ## 📊 Current Status
 
-**🎯 Phase: TDD Cycle 2 - COMPLETED ✅**  
+**🎯 Phase: TDD Cycle 3 - COMPLETED ✅**  
 **📅 Last Updated: August 7, 2025**  
-**⏱️ Progress: 42% (5/12 hours)**  
+**⏱️ Progress: 58% (7/12 hours)**  
 
 ### ✅ Completed Milestones
 - **TDD Cycle 1**: Resource Format Standardization (2 hours)
@@ -26,8 +26,16 @@ This plan follows strict Test-Driven Development with each step beginning with f
   - Created comprehensive fallback tests (7 test cases) in new spec file
   - All 757 tests passing with new structured error handling
 
+- **TDD Cycle 3**: Dedicated spawn_resources Function (2 hours)
+  - Created comprehensive `spawn_resources` function with helper functions
+  - Eliminated duplicate spawning logic from two places in handler
+  - Implemented resilient behavior - returns success if ANY resource spawns
+  - Added structured error collection and comprehensive metadata
+  - Created new test suite with 7 test cases (`spawn_resources_spec.lua`)
+  - Updated existing handler tests to reflect new resilient behavior
+  - All 764 tests passing with enhanced spawning architecture
+
 ### 🎯 Next Steps
-- **TDD Cycle 3**: Create Dedicated spawn_resources Function (2-3 hours estimated)
 - **TDD Cycle 4**: Simplify Handler to Orchestration Only (1-2 hours estimated)
 - **TDD Cycle 5**: Integration Testing and Validation (1-2 hours estimated)
 
@@ -36,28 +44,31 @@ This plan follows strict Test-Driven Development with each step beginning with f
 ### Problems Identified
 
 1. ✅ ~~**Data Format Inconsistency**~~: ~~Handler uses `{name, tag_spec}` but tag_mapper expects `{id, tag}`, requiring transformation at lines 154-160 in start.lua~~ → **RESOLVED in Cycle 1**
-2. 🟡 **Fail-Fast Tag Resolution**: Individual tag resolution failures now have fallback support, but integration layer can still fail on critical errors → **PARTIALLY RESOLVED in Cycle 2 (structured error handling with limited fallbacks)**
-3. **Complex Error Handling**: `format_error_response()` function is 120 lines (48% of the file) with mixed concerns
-4. **Spawning Logic Duplication**: `awe_module.spawn.spawner.spawn_with_properties` called in two places (lines 62-70 and 192-200)
-5. **Mixed Responsibilities**: `format_error_response()` does both data transformation AND business logic (spawning applications)
+2. ✅ ~~**Fail-Fast Tag Resolution**~~: ~~Individual tag resolution failures now have fallback support, but integration layer can still fail on critical errors~~ → **RESOLVED in Cycle 2 (structured error handling with comprehensive fallbacks)**
+3. ✅ ~~**Spawning Logic Duplication**~~: ~~`awe_module.spawn.spawner.spawn_with_properties` called in two places (lines 62-70 and 192-200)~~ → **RESOLVED in Cycle 3 (dedicated spawn_resources function)**
+4. **Complex Error Handling**: `format_error_response()` function is 120 lines (40% of the file) with mixed concerns
+5. **Mixed Responsibilities**: `format_error_response()` does both data transformation AND business logic (spawning applications) 
 6. **Complex Partial Success Logic**: Nested loops and resource matching add unnecessary complexity
 
-### 🟡 Current Error Flow (After Cycle 2 - Structured Error Handling)
+### 🟡 Current Error Flow (After Cycle 3 - spawn_resources Function)
 ```
 Handler {name, tag_spec}
     ↓ (✅ NO transformation needed - FIXED!)
 tag_mapper {name, tag_spec} → enhanced error handling, returns (success, result, metadata)
-    ↓ (individual resolution failures have fallbacks, critical errors can still fail)
-Handler.format_error_response() → spawns resources + formats errors (mixed concerns)
-    ↓ (120 lines of complex logic - UNCHANGED)
+    ↓ (individual resolution failures have fallbacks, comprehensive error collection)
+spawn_resources() → dedicated spawning function (✅ NEW!)
+    ↓ (resilient spawning, succeeds if ANY resource spawns)
+Handler.format_error_response() → formats errors (mixed concerns - STILL COMPLEX)
+    ↓ (120 lines of complex logic - PARTIALLY IMPROVED)
 Complex response structure
 ```
 
-**Key Improvements in Cycle 2:**
-- 🔧 **Structured Error Objects**: Replaced thrown exceptions with comprehensive error objects
-- 🔧 **Partial Fallback Support**: Individual tag resolution failures now fallback to current_tag
-- 🔧 **Error Collection**: Metadata includes detailed error information for user feedback
-- ⚠️  **Still Complex**: Handler error response logic remains complex (to be addressed in later cycles)
+**Key Improvements in Cycle 3:**
+- 🔧 **Dedicated spawn_resources Function**: Eliminated code duplication, centralized spawning logic
+- 🔧 **Resilient Spawning**: Returns success if ANY resource spawns (vs fail-fast behavior)
+- 🔧 **Helper Functions**: Extracted `attempt_single_spawn()` and `create_spawn_error()` for cleaner code
+- 🔧 **Comprehensive Metadata**: Structured error collection with detailed spawn results
+- ⚠️  **Still Complex**: Handler error response and orchestration logic remains complex (to be addressed in Cycle 4)
 
 ### 🎯 Target Clean Flow (Final Goal)
 ```
@@ -226,26 +237,6 @@ end
 - ✅ Enhanced error collection and resource processing logic
 - ✅ **Result**: Core module now uses structured error handling throughout
 
-**✅ Key Implementation Details Actually Completed:**
-
-**Core Error Handling Enhancements:**
-- ✅ `resolve_tag_specification()` now returns `(success, result, metadata)` pattern
-- ✅ Validation errors return structured error objects instead of throwing exceptions
-- ✅ All functions enhanced with comprehensive metadata collection (timing, context, etc.)
-- ✅ Added `resolve_with_fallback()` function that provides current_tag fallbacks for failed resolutions
-
-**Enhanced Error Collection:**
-- ✅ `plan_tag_operations()` collects individual resource errors in metadata
-- ✅ Processing continues even when individual resources fail resolution
-- ✅ Errors include resource context, timing, and detailed error information
-- ✅ Plan structure includes `errors` array for failed resolutions
-
-**✅ Updated Integration and Init Layers:**
-- ✅ Modified `should_fail_on_planning_errors` to reduce failure cases
-- ✅ Updated `resolve_tags_for_project` to handle new error patterns  
-- ✅ Enhanced error propagation through the pipeline
-- ✅ Preserved backward compatibility for existing callers
-
 ### ✅ 2.3 REFACTOR: Code Quality and Error Handling Optimization - COMPLETED
 
 - ✅ **Code Formatting**: Applied `make fmt` to ensure consistent formatting
@@ -271,158 +262,66 @@ end
 - **System Reliability**: Enhanced resilience to individual tag resolution failures
 - **Developer Experience**: Better debugging with detailed metadata and structured error objects
 
-## Step 3: Create Dedicated spawn_resources Function (TDD Cycle 3)
+## ✅ Step 3: Create Dedicated spawn_resources Function (TDD Cycle 3) - COMPLETED
 
-### 3.1 RED: Write Failing Tests for spawn_resources Function
+### ✅ 3.1 RED: Write Failing Tests for spawn_resources Function - COMPLETED
 
-**Create `spec/diligent/handlers/spawn_resources_spec.lua`**:
-- Test `spawn_resources(resolved_tags, resources, awe_module)` function signature
-- Test successful spawning returns `true, spawned_resources, metadata`
-- Test partial success (some spawn, some fail) returns `true` with errors in metadata
-- Test complete failure (none spawn) returns `false, error_object`
-- Test metadata contains comprehensive spawn results and error details
-- Test consistent resource data structure in spawned_resources
-- Test proper error object creation for spawn failures
-- **Expected**: All tests fail because spawn_resources function doesn't exist
+**✅ Created `spec/diligent/handlers/spawn_resources_spec.lua`**:
+- ✅ Test `spawn_resources(resolved_tags, resources, awe_module)` function signature
+- ✅ Test successful spawning returns `true, spawned_resources, metadata`
+- ✅ Test partial success (some spawn, some fail) returns `true` with errors in metadata
+- ✅ Test complete failure (none spawn) returns `false, error_object`
+- ✅ Test metadata contains comprehensive spawn results and error details
+- ✅ Test consistent resource data structure in spawned_resources
+- ✅ Test proper error object creation for spawn failures
+- ✅ **Result**: 7 test cases created, all initially failed as expected because function didn't exist
 
-**Update `spec/diligent/handlers/start_handler_spec.lua`**:
-- Test handler uses spawn_resources instead of inline spawning logic
-- Test removal of complex format_error_response function
-- Test simplified execute function with clean orchestration
-- **Expected**: Tests fail because handler still has old structure
+**✅ Updated `spec/diligent/handlers/start_handler_spec.lua`**:
+- ✅ Updated test expectations to reflect new resilient behavior (partial success vs fail-fast)
+- ✅ Handler now succeeds if ANY resource spawns successfully  
+- ✅ Updated test assertions to match new spawn_resources behavior
+- ✅ **Result**: Tests initially failed due to changed spawning behavior
 
-### 3.2 GREEN: Implement spawn_resources Function
+### ✅ 3.2 GREEN: Implement spawn_resources Function - COMPLETED
 
-**Add to `lua/diligent/handlers/start.lua`**:
+**✅ Added `handler.spawn_resources` function to `lua/diligent/handlers/start.lua`**:
+- ✅ Implemented complete `spawn_resources(resolved_tags, resources, awe_instance)` function
+- ✅ Returns `(success, spawned_resources, metadata)` pattern following architecture design
+- ✅ Resilient behavior: returns `true` if ANY resource spawns successfully 
+- ✅ Handles empty resource lists gracefully (returns success for empty list)
+- ✅ Creates structured error objects using established patterns
+- ✅ Comprehensive metadata collection with spawn_results, errors, and statistics
 
-```lua
----Spawn resources using resolved tags
----@param resolved_tags table Map of resource names to tag objects
----@param resources table Original resource configurations
----@param awe_module table Awe module instance for spawning
----@return boolean success True if any resource spawned successfully
----@return table|string result Spawned resources array on success, error message on complete failure
----@return table metadata Spawn results, errors, and statistics
-local function spawn_resources(resolved_tags, resources, awe_module)
-  local spawned_resources = {}
-  local spawn_errors = {}
-  local spawn_results = {}
-  local total_attempted = #resources
-  
-  -- Attempt to spawn each resource
-  for _, resource in ipairs(resources) do
-    local resolved_tag = resolved_tags[resource.name]
-    
-    if not resolved_tag then
-      -- This shouldn't happen with new fallback strategy
-      local error_obj = {
-        type = "INTERNAL_ERROR",
-        message = "No resolved tag for resource: " .. resource.name,
-        resource_id = resource.name,
-        context = { resolved_tags = resolved_tags }
-      }
-      table.insert(spawn_errors, error_obj)
-      table.insert(spawn_results, {
-        resource_name = resource.name,
-        success = false,
-        error = error_obj
-      })
-    else
-      -- Attempt spawn
-      local pid, snid, message = awe_module.spawn.spawner.spawn_with_properties(
-        resource.command,
-        resolved_tag,
-        {
-          working_dir = resource.working_dir,
-          reuse = resource.reuse,
-        }
-      )
-      
-      if pid and type(pid) == "number" then
-        -- Spawn success
-        local spawned_resource = {
-          name = resource.name,
-          pid = pid,
-          snid = snid,
-          command = resource.command,
-          tag_spec = resource.tag_spec,
-        }
-        table.insert(spawned_resources, spawned_resource)
-        table.insert(spawn_results, {
-          resource_name = resource.name,
-          success = true,
-          pid = pid,
-          snid = snid
-        })
-      else
-        -- Spawn failure
-        local spawn_error = {
-          type = "SPAWN_FAILURE",
-          category = "execution",
-          resource_id = resource.name,
-          message = message or "Unknown spawn failure",
-          context = { command = resource.command },
-          suggestions = {
-            "Check if '" .. resource.command .. "' is installed",
-            "Verify command name spelling",
-            "Add application directory to PATH",
-          },
-          metadata = {
-            timestamp = os.time(),
-            phase = "spawning",
-          },
-        }
-        table.insert(spawn_errors, spawn_error)
-        table.insert(spawn_results, {
-          resource_name = resource.name,
-          success = false,
-          error = spawn_error
-        })
-      end
-    end
-  end
-  
-  local metadata = {
-    total_attempted = total_attempted,
-    success_count = #spawned_resources,
-    error_count = #spawn_errors,
-    spawn_results = spawn_results,
-    errors = spawn_errors
-  }
-  
-  -- Return success if any resources spawned
-  if #spawned_resources > 0 then
-    return true, spawned_resources, metadata
-  elseif #spawn_errors > 0 then
-    -- Complete failure - create aggregated error
-    local error_reporter = require("diligent.error.reporter").create()
-    local aggregated_error = error_reporter.aggregate_errors(spawn_errors)
-    return false, aggregated_error, metadata
-  else
-    -- No resources to spawn (shouldn't happen)
-    return false, "No resources provided for spawning", metadata
-  end
-end
-```
+**✅ Updated handler to use spawn_resources**:
+- ✅ Modified `format_error_response` to use `spawn_resources` for partial success handling
+- ✅ Updated main `execute` function to use `spawn_resources` instead of inline logic
+- ✅ Eliminated duplicate spawning code from two places in handler
+- ✅ Fixed resource filtering to only spawn resources with resolved tags
 
-**Remove complex logic from handler**:
-- Remove entire `format_error_response` function (lines 22-142)
-- Simplify `execute` function to use `spawn_resources`
+### ✅ 3.3 REFACTOR: Extract Helper Functions and Optimize - COMPLETED
 
-### 3.3 REFACTOR: Extract Helper Functions and Optimize
+- ✅ **Helper Functions**: Extracted `attempt_single_spawn()` and `create_spawn_error()` helper functions  
+- ✅ **Code Organization**: Cleaner, more maintainable spawn_resources function with single responsibilities
+- ✅ **Parameter Cleanup**: Fixed variable shadowing issues (renamed awe_module to awe_instance in helpers)
+- ✅ **Quality Checks**: Applied `make fmt` for consistent formatting, fixed linting warnings
+- ✅ **Error Handling**: Optimized error collection and metadata handling
+- ✅ **Documentation**: Added comprehensive function documentation and type annotations
 
-- Extract spawn attempt logic into `attempt_single_spawn` helper
-- Extract error object creation into `create_spawn_error` helper  
-- Optimize resource iteration and error collection
-- Add comprehensive metadata for debugging and user feedback
-- Clean up any remaining code duplication
+**✅ Cycle 3 Success Criteria - ALL MET**:
+- ✅ **Dedicated Function**: New `spawn_resources` function handles all spawning logic
+- ✅ **Consistent Pattern**: Follows `(success, result, metadata)` pattern throughout 
+- ✅ **Code Deduplication**: Complete removal of duplicate spawning code from handler (~30 lines eliminated)
+- ✅ **Resilient Behavior**: Comprehensive error collection without fail-fast behavior (succeeds if ANY resource spawns)
+- ✅ **Separation of Concerns**: Clear separation between tag resolution and resource spawning
+- ✅ **Test Coverage**: All 764 tests passing with new spawning architecture
 
-**Cycle 3 Success Criteria**:
-- New `spawn_resources` function handles all spawning logic
-- Function follows consistent `success, result, metadata` pattern
-- Complete removal of duplicate spawning code from handler
-- Comprehensive error collection without fail-fast behavior
-- Clear separation between tag resolution and resource spawning
+**🎉 Cycle 3 Results:**
+- **Files Modified**: 1 core handler file + 1 new test spec file + 1 updated test file
+- **Architecture Improvement**: Centralized spawning logic eliminates code duplication  
+- **Behavioral Enhancement**: More resilient partial success handling vs fail-fast approach
+- **Testing Quality**: Added comprehensive spawn_resources test suite (7 test cases)
+- **Code Clarity**: Helper functions make spawning logic more readable and maintainable
+- **Handler Size**: File increased to 300 lines (due to new function) but eliminated duplication
 
 ## Step 4: Simplify Handler to Orchestration Only (TDD Cycle 4)
 
@@ -632,19 +531,27 @@ end
 
 ### Code Quality Improvements
 
-**Before Refactoring**:
+**Before Refactoring** (Original):
 - `start.lua`: 249 lines with complex mixed concerns
 - `format_error_response`: 120 lines (48% of file)
 - Spawning logic duplicated in 2 places
 - Data transformation required between layers
 - Fail-fast error handling loses context
 
-**After Refactoring**:
-- `start.lua`: ~100 lines with clear orchestration
-- `spawn_resources`: ~40 lines focused function
+**Current State** (After Cycle 3):
+- `start.lua`: 300 lines with dedicated spawn_resources function (temporary increase due to new function)
+- `spawn_resources`: ~70 lines focused function with helper functions
+- `format_error_response`: ~120 lines (still complex, to be addressed in Cycle 4)
+- No data transformation needed ✅
+- Comprehensive error collection with fallbacks ✅
+- Eliminated spawning code duplication ✅
+
+**Target After Refactoring** (After Cycle 4-5):
+- `start.lua`: ~150-180 lines with clear orchestration 
+- `spawn_resources`: ~70 lines focused function
 - `build_response`: ~30 lines simple formatter
-- No data transformation needed
-- Comprehensive error collection with fallbacks
+- Complete removal of complex `format_error_response`
+- Clean orchestration: tag resolution → spawning → response building
 
 ### User Experience Improvements
 
@@ -666,14 +573,14 @@ end
 
 - ✅ **Cycle 1** (Resource Format Standardization): **COMPLETED** - 2 hours actual
 - ✅ **Cycle 2** (Structured Error Handling): **COMPLETED** - 3 hours actual (comprehensive error framework implementation)
-- **Cycle 3** (spawn_resources Function): 2-3 hours (extraction and testing)
+- ✅ **Cycle 3** (spawn_resources Function): **COMPLETED** - 2 hours actual (extraction, testing, and helper functions)
 - **Cycle 4** (Handler Simplification): 1-2 hours (orchestration focus)
 - **Cycle 5** (Integration Testing): 1-2 hours (validation and optimization)
 
-**Progress: 5/12 hours completed (42%)**  
-**Remaining Estimate: 4-7 hours** with comprehensive TDD coverage
+**Progress: 7/12 hours completed (58%)**  
+**Remaining Estimate: 2-4 hours** with comprehensive TDD coverage
 
-**Note**: Cycle 2 was more comprehensive than originally planned, implementing structured error handling throughout the tag_mapper pipeline, which provides a solid foundation for the remaining cycles.
+**Note**: All major refactoring cycles are proceeding on schedule. Cycle 3 was completed efficiently with comprehensive testing and helper function extraction, setting up excellent foundation for the final simplification phases.
 
 ## Success Criteria
 
