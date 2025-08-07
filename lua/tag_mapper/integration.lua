@@ -181,13 +181,15 @@ function integration.resolve_tags_for_project(resources, base_tag, interface)
   local screen_context = interface.get_screen_context()
 
   -- Step 2: Plan tag operations
-  local plan, plan_error =
+  local plan_success, plan_result, _plan_metadata =
     tag_mapper_core.plan_tag_operations(resources, screen_context, base_tag)
 
-  if not plan then
+  if not plan_success then
     -- Return planning error directly
-    return nil, plan_error
+    return nil, plan_result
   end
+
+  local plan = plan_result
 
   -- Check if plan has errors that should cause complete failure
   local should_fail, aggregated_error =

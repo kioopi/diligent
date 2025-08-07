@@ -7,8 +7,8 @@ say:set(
 )
 say:set("assertion.success.negative", "Expected failure (got success: %s).")
 local assert_success = function(state, arguments)
-  local success, result = table.unpack(arguments)
-  return success == true, { result }
+  local success, result, meta = table.unpack(arguments)
+  return success == true, { result, meta }
 end
 
 assert:register(

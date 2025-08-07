@@ -437,12 +437,11 @@ describe("tag_mapper", function()
           }
 
           local resources = { { id = "test", tag = "failing_tag" } }
-          local success, error_msg =
+          local error = assert.no.success(
             tag_mapper.resolve_tags_for_project(resources, 3, failing_interface)
+          )
 
-          assert.is_false(success)
-          assert.is_string(error_msg)
-          assert.matches("Tag creation failed", error_msg)
+          assert.matches("Tag creation failed: failed to create tag: failing_tag", error.message)
         end
       )
 

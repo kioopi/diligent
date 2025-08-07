@@ -160,16 +160,38 @@ function tag_mapper.resolve_tags_for_project(resources, base_tag, interface)
     integration.resolve_tags_for_project(resources, base_tag, interface)
 
   if not workflow_result then
-    -- Handle structured error object
-    local error_message = error_obj and error_obj.message or "unknown error"
-    return false, "Tag resolution failed: " .. error_message
+    -- Return structured error object directly instead of string
+    if error_obj then
+      return false, error_obj
+    else
+      -- Create a structured error object for unknown errors
+      local error_reporter = require("diligent.error.reporter").create()
+      return false,
+        error_reporter.create_tag_resolution_error(
+          nil,
+          nil,
+          "TAG_RESOLUTION_ERROR",
+          "Tag resolution failed: unknown error",
+          {}
+        )
+    end
   end
 
   -- Check execution status
   if workflow_result.execution.metadata.overall_status ~= "success" then
     local first_failure = workflow_result.execution.failures[1]
     local error_msg = first_failure and first_failure.error or "unknown error"
-    return false, "Tag creation failed: " .. error_msg
+
+    -- Return structured error object instead of string
+    local error_reporter = require("diligent.error.reporter").create()
+    return false,
+      error_reporter.create_tag_resolution_error(
+        nil,
+        nil,
+        "TAG_CREATION_ERROR",
+        "Tag creation failed: " .. error_msg,
+        { failure = first_failure }
+      )
   end
 
   -- Extract individual resolved tag objects for each resource

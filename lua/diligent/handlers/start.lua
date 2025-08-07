@@ -167,26 +167,7 @@ function start_handler.create(awe_module)
     )
 
     if not tag_success then
-      -- Tag resolution failed - always use enhanced format
-      -- Convert string errors to structured error objects if needed
-      if tag_result and type(tag_result) == "string" then
-        -- Convert old string format to structured error object
-        local error_obj = {
-          type = "TAG_RESOLUTION_ERROR",
-          category = "validation",
-          resource_id = #payload.resources == 1 and payload.resources[1].name
-            or nil,
-          message = tag_result,
-          context = {},
-          suggestions = {},
-          metadata = {
-            timestamp = os.time(),
-            phase = "planning",
-          },
-        }
-        tag_result = error_obj
-      end
-      -- Always use enhanced error format
+      -- Tag resolution failed - tag_result is always a structured error object now
       return handler.format_error_response(
         payload.project_name,
         tag_result,

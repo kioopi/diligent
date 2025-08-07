@@ -64,28 +64,39 @@ end
 ---@param tag_spec number|string Tag specification (relative offset, absolute string, or name)
 ---@param base_tag number Current base tag index for relative calculations
 ---@param screen_context table Screen context with available tags and metadata
----@return table|nil result Structured tag resolution result or nil on error
----@return table|nil error Error object if validation fails
+---@return boolean success True if resolution succeeded
+---@return table result Structured tag resolution result on success, error object on failure
+---@return table metadata Additional context (timing, warnings, etc.)
 function tag_mapper_core.resolve_tag_specification(
   tag_spec,
   base_tag,
   screen_context
 )
-  -- Input validation - return error objects instead of throwing
+  local start_time = os.clock()
+
+  -- Input validation - return error objects with new pattern
   if tag_spec == nil then
-    return nil, create_validation_error("tag spec is required")
+    return false,
+      create_validation_error("tag spec is required"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   if base_tag == nil then
-    return nil, create_validation_error("base tag is required")
+    return false,
+      create_validation_error("base tag is required"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   if type(base_tag) ~= "number" then
-    return nil, create_validation_error("base tag must be a number")
+    return false,
+      create_validation_error("base tag must be a number"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   if screen_context == nil then
-    return nil, create_validation_error("screen context is required")
+    return false,
+      create_validation_error("screen context is required"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   -- Handle relative numeric offset
@@ -106,12 +117,22 @@ function tag_mapper_core.resolve_tag_specification(
       overflow = true
     end
 
-    return {
-      type = "relative",
-      resolved_index = resolved_index,
-      overflow = overflow,
-      original_index = original_index,
+    local metadata = {
+      timing = os.clock() - start_time,
+      tag_type = "relative",
+      overflow_detected = overflow,
+      base_tag = base_tag,
+      offset = tag_spec,
     }
+
+    return true,
+      {
+        type = "relative",
+        resolved_index = resolved_index,
+        overflow = overflow,
+        original_index = original_index,
+      },
+      metadata
   end
 
   -- Handle absolute digit string
@@ -127,34 +148,57 @@ function tag_mapper_core.resolve_tag_specification(
       overflow = true
     end
 
-    return {
-      type = "absolute",
-      resolved_index = resolved_index,
-      overflow = overflow,
-      original_index = original_index,
+    local metadata = {
+      timing = os.clock() - start_time,
+      tag_type = "absolute",
+      overflow_detected = overflow,
+      original_spec = tag_spec,
     }
+
+    return true,
+      {
+        type = "absolute",
+        resolved_index = resolved_index,
+        overflow = overflow,
+        original_index = original_index,
+      },
+      metadata
   end
 
   -- Handle named tag
   if type(tag_spec) == "string" then
     local existing_tag = find_existing_tag_by_name(tag_spec, screen_context)
 
-    return {
-      type = "named",
-      name = tag_spec,
-      overflow = false,
-      needs_creation = existing_tag == nil,
+    local metadata = {
+      timing = os.clock() - start_time,
+      tag_type = "named",
+      tag_exists = existing_tag ~= nil,
+      tag_name = tag_spec,
     }
+
+    return true,
+      {
+        type = "named",
+        name = tag_spec,
+        overflow = false,
+        needs_creation = existing_tag == nil,
+      },
+      metadata
   end
 
   -- Invalid tag spec type
-  return nil,
+  return false,
     create_tag_spec_error(
       tag_spec,
       "invalid tag spec type: " .. type(tag_spec),
       "TAG_SPEC_INVALID",
       { tag_spec_type = type(tag_spec) }
-    )
+    ),
+    {
+      validation_error = true,
+      timing = os.clock() - start_time,
+      invalid_type = type(tag_spec),
+    }
 end
 
 ---Plan tag operations for a list of resources
@@ -162,24 +206,33 @@ end
 ---@param resources table List of resource objects with id and tag fields
 ---@param screen_context table Screen context with available tags and metadata
 ---@param base_tag number Current base tag index for relative calculations
----@return table|nil plan Structured operation plan with assignments, creations, warnings or nil on error
----@return table|nil error Error object if validation fails
+---@return boolean success True if planning succeeded
+---@return table result Structured operation plan on success, error object on failure
+---@return table metadata Additional context (timing, statistics, etc.)
 function tag_mapper_core.plan_tag_operations(
   resources,
   screen_context,
   base_tag
 )
-  -- Input validation - return error objects instead of throwing
+  local start_time = os.clock()
+
+  -- Input validation - return error objects with new pattern
   if resources == nil then
-    return nil, create_validation_error("resources list is required")
+    return false,
+      create_validation_error("resources list is required"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   if screen_context == nil then
-    return nil, create_validation_error("screen context is required")
+    return false,
+      create_validation_error("screen context is required"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   if base_tag == nil then
-    return nil, create_validation_error("base tag is required")
+    return false,
+      create_validation_error("base tag is required"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   -- Initialize plan structure
@@ -203,13 +256,15 @@ function tag_mapper_core.plan_tag_operations(
   for _, resource in ipairs(resources) do
     if resource.id and resource.tag ~= nil then
       -- Resolve tag specification for this resource
-      local resolution, error_obj = tag_mapper_core.resolve_tag_specification(
-        resource.tag,
-        base_tag,
-        screen_context
-      )
+      local success, result, _metadata =
+        tag_mapper_core.resolve_tag_specification(
+          resource.tag,
+          base_tag,
+          screen_context
+        )
 
-      if resolution then
+      if success then
+        local resolution = result
         -- Create assignment entry
         local assignment = {
           resource_id = resource.id,
@@ -239,6 +294,7 @@ function tag_mapper_core.plan_tag_operations(
         end
       else
         -- Handle individual resource error
+        local error_obj = result
         error_obj.resource_id = resource.id -- Add resource context
         table.insert(resource_errors, error_obj)
         -- Continue processing other resources
@@ -262,7 +318,16 @@ function tag_mapper_core.plan_tag_operations(
     plan.has_errors = true
   end
 
-  return plan
+  local metadata = {
+    timing = os.clock() - start_time,
+    total_resources = #resources,
+    successful_resolutions = #plan.assignments,
+    errors_count = #resource_errors,
+    tags_to_create = #plan.creations,
+    warnings_count = #plan.warnings,
+  }
+
+  return true, plan, metadata
 end
 
 return tag_mapper_core
