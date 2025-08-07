@@ -239,12 +239,13 @@ function start_handler.create(awe_module)
       if type(tag_result) == "table" and tag_result.message then
         error_message = tag_result.message
       end
-      
+
       -- Use structured error format consistent with rest of handler
       local critical_error = {
         type = "CRITICAL_TAG_MAPPER_ERROR",
         category = "system",
-        message = "Critical tag mapper error: " .. (error_message or "unknown error"),
+        message = "Critical tag mapper error: "
+          .. (error_message or "unknown error"),
         context = { tag_result = tag_result },
         suggestions = {
           "Check tag_mapper module integrity",
@@ -256,7 +257,7 @@ function start_handler.create(awe_module)
           phase = "tag_resolution",
         },
       }
-      
+
       return false,
         {
           project_name = payload.project_name,

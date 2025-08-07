@@ -311,7 +311,7 @@ describe("Start Handler", function()
           },
         },
       }
-      
+
       phase5_handler = start_handler.create(real_awe_module)
 
       -- Legacy test infrastructure - format_error_response has been removed in TDD Cycle 4
@@ -331,7 +331,10 @@ describe("Start Handler", function()
 
       local success, result = phase5_handler.execute(payload)
 
-      assert.is_false(success, "Handler should fail when all resources fail to spawn")
+      assert.is_false(
+        success,
+        "Handler should fail when all resources fail to spawn"
+      )
 
       -- Test enhanced error response format with refactored handler
       assert.is_table(result, "Result should be a table")
@@ -368,7 +371,7 @@ describe("Start Handler", function()
             },
           },
         }
-        
+
         local mixed_handler = start_handler.create(mixed_awe_module)
 
         local payload = {
@@ -380,7 +383,7 @@ describe("Start Handler", function()
               tag_spec = 2,
             },
             {
-              name = "terminal", 
+              name = "terminal",
               command = "alacritty",
               tag_spec = "2",
             },
@@ -391,16 +394,27 @@ describe("Start Handler", function()
 
         -- Should succeed because terminal spawns successfully (partial success)
         assert.is_true(success, "Handler should succeed with partial success")
-        
+
         assert.equals("partial-test", result.project_name)
-        assert.equals(1, result.total_spawned, "Should have one spawned resource")
+        assert.equals(
+          1,
+          result.total_spawned,
+          "Should have one spawned resource"
+        )
         assert.equals("terminal", result.spawned_resources[1].name)
-        
+
         -- Should have warnings about the failed resource
         assert.is_not_nil(result.warnings, "Should have warnings")
-        assert.is_not_nil(result.warnings.spawn_errors, "Should have spawn errors")
-        assert.equals(1, #result.warnings.spawn_errors, "Should have one spawn error")
-        
+        assert.is_not_nil(
+          result.warnings.spawn_errors,
+          "Should have spawn errors"
+        )
+        assert.equals(
+          1,
+          #result.warnings.spawn_errors,
+          "Should have one spawn error"
+        )
+
         -- Verify tag operations are present
         assert.is_not_nil(result.tag_operations, "Should have tag operations")
       end
@@ -493,7 +507,7 @@ describe("Start Handler", function()
           },
         },
       }
-      
+
       local failure_handler = start_handler.create(failure_awe_module)
 
       local payload = {
@@ -513,7 +527,7 @@ describe("Start Handler", function()
       assert.equals(2, result.metadata.total_attempted)
       assert.equals(0, result.metadata.success_count)
       assert.equals(2, result.metadata.error_count)
-      
+
       -- Verify error structure
       for _, error_entry in ipairs(result.errors) do
         assert.equals("spawning", error_entry.phase)
@@ -582,7 +596,7 @@ describe("Start Handler", function()
           assert.equals("COMPLETE_FAILURE", result.error_type)
           assert.is_table(result.errors, "Should have errors array")
           assert.equals(1, #result.errors, "Should have one error")
-          
+
           -- Verify structured error details
           local error_entry = result.errors[1]
           assert.equals("tag_resolution", error_entry.phase)
