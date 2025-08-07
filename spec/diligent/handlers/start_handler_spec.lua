@@ -81,31 +81,41 @@ describe("Start Handler", function()
   end)
 
   describe("execute", function()
-    it("should spawn single app successfully", function()
-      local payload = {
-        project_name = "test-project",
-        resources = {
-          {
-            name = "editor",
-            command = "gedit",
-            tag_spec = "0",
+    it(
+      "should spawn single app successfully via simplified orchestration",
+      function()
+        local payload = {
+          project_name = "test-project",
+          resources = {
+            {
+              name = "editor",
+              command = "gedit",
+              tag_spec = "0",
+            },
           },
-        },
-      }
+        }
 
-      -- Create mock awe with successful spawn response
-      local result = assert.success(handler.execute(payload))
+        -- Create mock awe with successful spawn response
+        local result = assert.success(handler.execute(payload))
 
-      assert.are.equal("test-project", result.project_name)
-      assert.are.equal(1, #result.spawned_resources)
-      assert.are.equal("editor", result.spawned_resources[1].name)
-      assert.are.equal("gedit", result.spawned_resources[1].command)
-      assert.are.equal("0", result.spawned_resources[1].tag_spec)
-      assert.is_number(result.spawned_resources[1].pid)
-      assert.are.equal(1, result.total_spawned)
-    end)
+        -- Test simplified response structure (no complex error handling)
+        assert.are.equal("test-project", result.project_name)
+        assert.are.equal(1, #result.spawned_resources)
+        assert.are.equal("editor", result.spawned_resources[1].name)
+        assert.are.equal("gedit", result.spawned_resources[1].command)
+        assert.are.equal("0", result.spawned_resources[1].tag_spec)
+        assert.is_number(result.spawned_resources[1].pid)
+        assert.are.equal(1, result.total_spawned)
 
-    it("should handle spawn failure gracefully", function()
+        -- Verify tag_operations from tag resolution phase is included
+        assert.is_table(
+          result.tag_operations,
+          "Should include tag_operations from tag_mapper"
+        )
+      end
+    )
+
+    it("should handle spawn failure via simplified error response", function()
       local payload = {
         project_name = "test-project",
         resources = {
@@ -124,7 +134,7 @@ describe("Start Handler", function()
       local success, result = handler.execute(payload)
 
       assert.is_false(success, "Handler should fail with spawn error")
-      -- Now expects enhanced error format instead of backwards compatibility format
+      -- Test simplified response structure from build_combined_response
       assert.equals("test-project", result.project_name)
       assert.equals("COMPLETE_FAILURE", result.error_type)
       assert.is_table(result.errors)
@@ -132,6 +142,10 @@ describe("Start Handler", function()
       assert.equals("spawning", result.errors[1].phase)
       assert.equals("invalid", result.errors[1].resource_id)
       assert.matches("Command not found", result.errors[1].error.message)
+      -- Metadata should come from combined tag and spawn metadata
+      assert.is_table(result.metadata)
+      assert.equals(1, result.metadata.total_attempted)
+      assert.equals(0, result.metadata.success_count)
     end)
 
     it("should spawn multiple resources sequentially", function()
@@ -166,34 +180,52 @@ describe("Start Handler", function()
       assert.are.equal("alacritty", result.spawned_resources[2].command)
     end)
 
-    it("should handle partial failure in multi-resource project", function()
-      local payload = {
-        project_name = "partial-fail",
-        resources = {
-          {
-            name = "good-app",
-            command = "gedit",
-            tag_spec = "0",
+    it(
+      "should handle partial failure via simplified response building",
+      function()
+        local payload = {
+          project_name = "partial-fail",
+          resources = {
+            {
+              name = "good-app",
+              command = "gedit",
+              tag_spec = "0",
+            },
+            {
+              name = "bad-app",
+              command = "fail_spawn", -- Magic command that fails in mock_interface
+              tag_spec = "1",
+            },
           },
-          {
-            name = "bad-app",
-            command = "fail_spawn", -- Magic command that fails in mock_interface
-            tag_spec = "1",
-          },
-        },
-      }
+        }
 
-      local success, result = handler.execute(payload)
-      -- With new spawn_resources implementation, this should succeed because one resource spawns
-      assert.is_true(
-        success,
-        "Handler should succeed because good-app spawns successfully"
-      )
-      assert.equals("partial-fail", result.project_name)
-      assert.equals(1, result.total_spawned) -- Only good-app spawned
-      assert.equals(1, #result.spawned_resources)
-      assert.equals("good-app", result.spawned_resources[1].name)
-    end)
+        local success, result = handler.execute(payload)
+        -- With simplified handler, this should succeed with warnings in metadata
+        assert.is_true(
+          success,
+          "Handler should succeed because good-app spawns successfully"
+        )
+        assert.equals("partial-fail", result.project_name)
+        assert.equals(1, result.total_spawned) -- Only good-app spawned
+        assert.equals(1, #result.spawned_resources)
+        assert.equals("good-app", result.spawned_resources[1].name)
+
+        -- Test simplified response includes warnings for partial failures
+        assert.is_table(
+          result.warnings,
+          "Should include warnings for spawn failures"
+        )
+        assert.is_table(
+          result.warnings.spawn_errors,
+          "Should include spawn error details"
+        )
+        assert.equals(
+          1,
+          #result.warnings.spawn_errors,
+          "Should have one spawn error"
+        )
+      end
+    )
 
     it("should pass working directory and reuse options to spawner", function()
       local payload = {
@@ -285,9 +317,13 @@ describe("Start Handler", function()
             )
 
           if not tag_success then
-            return start_handler
-              .create(awe)
-              .format_error_response(payload.project_name, tag_result, payload.resources)
+            -- Legacy test - tag resolution failure should be handled by new simplified handler
+            return false,
+              {
+                error = "Tag resolution failed: "
+                  .. (tag_result.message or "unknown error"),
+                project_name = payload.project_name,
+              }
           end
 
           -- Process spawning with normal handler logic
@@ -295,9 +331,7 @@ describe("Start Handler", function()
         end,
       }
 
-      -- Add the format_error_response method
-      phase5_handler.format_error_response =
-        start_handler.create(awe).format_error_response
+      -- Legacy test infrastructure - format_error_response has been removed in TDD Cycle 4
     end)
 
     it("should collect structured error objects from tag_mapper", function()
@@ -370,9 +404,13 @@ describe("Start Handler", function()
             },
           }
 
-          return start_handler
-            .create(awe)
-            .format_error_response(payload.project_name, tag_result, payload.resources)
+          -- Legacy test - tag resolution failure should be handled by new simplified handler
+          return false,
+            {
+              error = "Tag resolution failed: "
+                .. (tag_result.message or "unknown error"),
+              project_name = payload.project_name,
+            }
         end
 
         local payload = {
@@ -512,9 +550,13 @@ describe("Start Handler", function()
           },
         }
 
-        return start_handler
-          .create(awe)
-          .format_error_response(payload.project_name, tag_result, payload.resources)
+        -- Legacy test - tag resolution failure should be handled by new simplified handler
+        return false,
+          {
+            error = "Tag resolution failed: "
+              .. (tag_result.message or "unknown error"),
+            project_name = payload.project_name,
+          }
       end
 
       local payload = {

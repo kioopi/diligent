@@ -143,155 +143,132 @@ function start_handler.create(awe_module)
     end
   end
 
-  -- Helper function to format error responses with structured error objects
-  function handler.format_error_response(project_name, error_obj, resources)
-    local errors = {}
-    local partial_success = nil
-    local success_count = 0
-    local error_count = 0
-    local total_attempted = #resources
+  -- Build combined response from tag and spawn metadata
+  ---@param tag_metadata table Metadata from tag resolution
+  ---@param spawn_metadata table Metadata from spawning operation
+  ---@param payload table Original request payload
+  ---@return boolean success Overall operation success
+  ---@return table response Response object with comprehensive information
+  function handler.build_combined_response(
+    tag_metadata,
+    spawn_metadata,
+    payload
+  )
+    local total_attempted = #payload.resources
+    local spawned_count = spawn_metadata.success_count or 0
+    local has_spawn_errors = spawn_metadata.error_count
+      and spawn_metadata.error_count > 0
+    local has_tag_errors = tag_metadata.errors and #tag_metadata.errors > 0
 
-    -- Handle different error object types
-    if error_obj.type == "MULTIPLE_TAG_ERRORS" then
-      -- Multiple tag errors with potential partial success
-      if error_obj.errors then
-        for _, err in ipairs(error_obj.errors) do
+    -- Determine overall success (succeed if any spawned OR if no resources to spawn)
+    local overall_success = spawned_count > 0 or total_attempted == 0
+
+    if overall_success then
+      -- Success response (some or all resources spawned)
+      local response = {
+        project_name = payload.project_name,
+        spawned_resources = spawn_metadata.result or {},
+        total_spawned = spawned_count,
+        tag_operations = tag_metadata.tag_operations or {},
+      }
+
+      -- Include warnings/errors in metadata if present
+      if has_tag_errors or has_spawn_errors then
+        response.warnings = {
+          tag_errors = tag_metadata.errors or {},
+          spawn_errors = spawn_metadata.errors or {},
+        }
+      end
+
+      return true, response
+    else
+      -- Failure response (no resources spawned)
+      local errors = {}
+
+      -- Collect tag errors
+      if has_tag_errors then
+        for _, error_obj in ipairs(tag_metadata.errors) do
           table.insert(errors, {
             phase = "tag_resolution",
-            resource_id = err.resource_id,
-            error = err,
+            resource_id = error_obj.resource_id,
+            error = error_obj,
           })
-          error_count = error_count + 1
         end
       end
 
-      -- Check for partial success data - use spawn_resources function
-      if
-        error_obj.partial_success and error_obj.partial_success.resolved_tags
-      then
-        -- Filter resources to only include those with resolved tags
-        local resolved_resources = {}
-        for _, resource in ipairs(resources) do
-          if error_obj.partial_success.resolved_tags[resource.name] then
-            table.insert(resolved_resources, resource)
-          end
-        end
-
-        -- Use the new spawn_resources function for partial success handling
-        local spawn_success, spawned_resources, spawn_metadata =
-          handler.spawn_resources(
-            error_obj.partial_success.resolved_tags,
-            resolved_resources,
-            awe_module
-          )
-
-        if spawn_success then
-          partial_success = {
-            spawned_resources = spawned_resources,
-            total_spawned = #spawned_resources,
-          }
-          success_count = #spawned_resources
-        end
-
-        -- Add spawn errors to existing error collection (only for resources that had successful tag resolution)
-        if spawn_metadata.errors then
-          for _, spawn_err in ipairs(spawn_metadata.errors) do
-            table.insert(errors, {
-              phase = "spawning",
-              resource_id = spawn_err.resource_id,
-              error = spawn_err,
-            })
-            error_count = error_count + 1
-          end
+      -- Collect spawn errors
+      if has_spawn_errors then
+        for _, error_obj in ipairs(spawn_metadata.errors) do
+          table.insert(errors, {
+            phase = "spawning",
+            resource_id = error_obj.resource_id,
+            error = error_obj,
+          })
         end
       end
-    else
-      -- Single error case - determine phase from error metadata or type
-      local phase = "tag_resolution" -- default
-      if
-        (error_obj.metadata and error_obj.metadata.phase == "spawning")
-        or error_obj.type == "SPAWN_FAILURE"
-      then
-        phase = "spawning"
-      end
 
-      table.insert(errors, {
-        phase = phase,
-        resource_id = error_obj.resource_id
-          or (resources[1] and resources[1].name),
-        error = error_obj,
-      })
-      error_count = 1
+      local response = {
+        project_name = payload.project_name,
+        error_type = "COMPLETE_FAILURE",
+        errors = errors,
+        metadata = {
+          total_attempted = total_attempted,
+          success_count = 0,
+          error_count = #errors,
+        },
+      }
+
+      return false, response
     end
-
-    local error_type = success_count > 0 and "PARTIAL_FAILURE"
-      or "COMPLETE_FAILURE"
-
-    local response = {
-      project_name = project_name,
-      error_type = error_type,
-      errors = errors,
-      metadata = {
-        total_attempted = total_attempted,
-        success_count = success_count,
-        error_count = error_count,
-      },
-    }
-
-    if partial_success then
-      response.partial_success = partial_success
-    end
-
-    return false, response
   end
 
   function handler.execute(payload)
-    -- Get the interface for tag_mapper (tag_mapper expects raw interface, not awe_module)
-    local interface = awe_module.interface
-
     -- Get current tag index using tag_mapper
-    local current_tag_index = tag_mapper.get_current_tag(interface)
+    local current_tag_index = tag_mapper.get_current_tag(awe_module.interface)
 
-    -- Batch tag resolution for all resources at once (no transformation needed)
+    -- Step 1: Batch tag resolution for all resources (with fallbacks)
     local tag_success, tag_result = tag_mapper.resolve_tags_for_project(
-      payload.resources,
+      payload.resources, -- {name, tag_spec} directly - no transformation!
       current_tag_index,
-      interface
+      awe_module.interface
     )
 
+    -- Handle critical tag_mapper failure (rare)
     if not tag_success then
-      -- Tag resolution failed - tag_result is always a structured error object now
-      return handler.format_error_response(
-        payload.project_name,
-        tag_result,
-        payload.resources
-      )
-    end
-
-    -- Use spawn_resources function to handle all spawning
-    local spawn_success, spawned_resources, _ = handler.spawn_resources(
-      tag_result.resolved_tags,
-      payload.resources,
-      awe_module
-    )
-
-    if spawn_success then
-      -- All or partial spawning success
-      return true,
+      local error_message = tag_result
+      if type(tag_result) == "table" and tag_result.message then
+        error_message = tag_result.message
+      end
+      return false,
         {
+          error = "Critical tag mapper error: "
+            .. (error_message or "unknown error"),
           project_name = payload.project_name,
-          spawned_resources = spawned_resources,
-          total_spawned = #spawned_resources,
-          tag_operations = tag_result.tag_operations,
         }
-    else
-      -- Complete spawning failure - use error response formatting
-      return handler.format_error_response(
-        payload.project_name,
-        spawned_resources, -- This is the error object when spawn_success is false
-        payload.resources
-      )
     end
+
+    -- Extract resolved_tags and metadata from tag_result
+    local resolved_tags = tag_result.resolved_tags
+    local tag_metadata = {
+      tag_operations = tag_result.tag_operations,
+      errors = tag_result.tag_operations.errors or {},
+    }
+
+    -- Step 2: Spawn resources using resolved tags
+    local spawn_success, spawned_resources, spawn_metadata =
+      handler.spawn_resources(resolved_tags, payload.resources, awe_module)
+
+    -- Store results in spawn_metadata for response building
+    if spawn_success then
+      spawn_metadata.result = spawned_resources
+    end
+
+    -- Step 3: Build combined response
+    return handler.build_combined_response(
+      tag_metadata,
+      spawn_metadata,
+      payload
+    )
   end
 
   return handler
