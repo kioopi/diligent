@@ -913,15 +913,16 @@ describe("Start Handler", function()
       -- Restore original tag_mapper
       package.loaded["tag_mapper"].resolve_tag = original_resolve_tag
 
-      assert.is_false(success, "Handler should fail with invalid tag")
-      -- Now expects enhanced error format instead of backwards compatibility format
+      -- With fallback strategy, handler should succeed with fallbacks
+      assert.is_true(success, "Handler should succeed with fallback strategy")
       assert.equals("failure-test", result.project_name)
-      assert.equals("COMPLETE_FAILURE", result.error_type)
-      assert.is_table(result.errors)
-      assert.equals(1, #result.errors)
-      assert.equals("tag_resolution", result.errors[1].phase)
-      assert.equals("invalid", result.errors[1].resource_id)
-      assert.matches("invalid tag spec", result.errors[1].error.message)
+      assert.is_table(
+        result.spawned_resources,
+        "Should have spawned resources with fallbacks"
+      )
+      assert.is_number(result.total_spawned, "Should have spawned count")
+      -- Tag operations should include error information for failed resolution
+      assert.is_table(result.tag_operations, "Should have tag operations info")
     end)
   end)
 
@@ -1180,18 +1181,20 @@ describe("Start Handler", function()
         }
 
         local success, result = handler.execute(payload)
-        assert.is_false(
-          success,
-          "Handler should fail due to tag creation failure"
-        )
-        -- Now expects enhanced error format instead of backwards compatibility format
+        -- With fallback strategy, handler should succeed with fallbacks
+        assert.is_true(success, "Handler should succeed with fallback strategy")
         assert.equals("tag-fail-test", result.project_name)
-        assert.equals("COMPLETE_FAILURE", result.error_type)
-        assert.is_table(result.errors)
-        assert.equals(1, #result.errors)
-        assert.equals("tag_resolution", result.errors[1].phase)
-        assert.equals("test-app", result.errors[1].resource_id)
-        assert.matches("Tag creation failed", result.errors[1].error.message)
+        assert.is_table(
+          result.spawned_resources,
+          "Should have spawned resources with fallbacks"
+        )
+        assert.is_number(result.total_spawned, "Should have spawned count")
+        -- Should still spawn the resource using fallback tag
+        assert.equals(
+          1,
+          result.total_spawned,
+          "Should spawn 1 resource with fallback"
+        )
       end)
     end)
   end)

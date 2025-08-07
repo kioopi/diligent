@@ -415,38 +415,49 @@ describe("tag_mapper", function()
     end)
 
     describe("error handling", function()
-      it(
-        "should return false and error message on tag creation failure",
-        function()
-          -- Create a failing mock interface
-          local failing_interface = {
-            get_screen_context = function()
-              return {
-                screen = { index = 1 },
-                current_tag_index = 3,
-                available_tags = {},
-                tag_count = 0,
-              }
-            end,
-            create_named_tag = function(name)
-              return nil
-            end, -- Simulate failure
-            find_tag_by_name = function(name)
-              return nil
-            end,
-          }
+      it("should succeed with fallback when tag creation fails", function()
+        -- Create a failing mock interface
+        local failing_interface = {
+          get_screen_context = function()
+            return {
+              screen = { index = 1 },
+              current_tag_index = 3,
+              available_tags = {},
+              tag_count = 0,
+            }
+          end,
+          create_named_tag = function(name)
+            return nil
+          end, -- Simulate failure
+          find_tag_by_name = function(name)
+            return nil
+          end,
+        }
 
-          local resources = { { name = "test", tag_spec = "failing_tag" } }
-          local error = assert.no.success(
-            tag_mapper.resolve_tags_for_project(resources, 3, failing_interface)
-          )
+        local resources = { { name = "test", tag_spec = "failing_tag" } }
+        local success, result =
+          tag_mapper.resolve_tags_for_project(resources, 3, failing_interface)
 
-          assert.matches(
-            "Tag creation failed: failed to create tag: failing_tag",
-            error.message
-          )
-        end
-      )
+        -- With fallback strategy, should succeed despite tag creation failure
+        assert.is_true(success, "should succeed with fallback strategy")
+        assert.is_table(result.resolved_tags, "should have resolved tags")
+        assert.is_not_nil(
+          result.resolved_tags.test,
+          "should have fallback tag for test"
+        )
+
+        -- Should fallback to current_tag (3) when tag creation fails
+        assert.equals(
+          3,
+          result.resolved_tags.test.index,
+          "should fallback to current_tag"
+        )
+        assert.equals(
+          "failing_tag",
+          result.resolved_tags.test.name,
+          "should preserve tag name"
+        )
+      end)
 
       it("should handle interface validation errors", function()
         local resources = { { name = "test", tag_spec = 2 } }

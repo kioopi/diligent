@@ -201,6 +201,48 @@ function tag_mapper_core.resolve_tag_specification(
     }
 end
 
+---Resolve tag specification with fallback strategy
+---Attempts normal resolution first, then applies fallback on failure
+---@param tag_spec number|string Tag specification to resolve
+---@param base_tag number Current base tag index for fallbacks
+---@param screen_context table Screen context with available tags
+---@return table resolved_tag Always returns a resolved tag object (with fallbacks)
+---@return table|nil error_obj Original error object if fallback was used, nil if normal resolution succeeded
+local function resolve_with_fallback(tag_spec, base_tag, screen_context)
+  -- Try normal resolution first
+  local success, result, _metadata = tag_mapper_core.resolve_tag_specification(
+    tag_spec,
+    base_tag,
+    screen_context
+  )
+
+  if success then
+    result.fallback_used = false
+    return result, nil -- no error - normal resolution succeeded
+  end
+
+  -- Normal resolution failed - apply fallback strategy
+  local current_tag = screen_context.current_tag_index or base_tag or 1
+
+  -- Ensure current_tag is in valid range (1-9)
+  if current_tag < 1 or current_tag > 9 then
+    current_tag = 1
+  end
+
+  -- Create fallback tag object
+  local fallback_tag = {
+    type = "absolute",
+    resolved_index = current_tag,
+    overflow = false,
+    name = tostring(current_tag),
+    needs_creation = false,
+    fallback_used = true,
+    original_error = result, -- preserve original error
+  }
+
+  return fallback_tag, result -- return fallback + original error for metadata
+end
+
 ---Plan tag operations for a list of resources
 ---Takes resources and screen context, returns structured operation plan
 ---@param resources table List of resource objects with name and tag_spec fields
@@ -235,11 +277,12 @@ function tag_mapper_core.plan_tag_operations(
       { validation_error = true, timing = os.clock() - start_time }
   end
 
-  -- Initialize plan structure
+  -- Initialize plan structure with errors array for fallback strategy
   local plan = {
     assignments = {},
     creations = {},
     warnings = {},
+    errors = {}, -- Always include errors array for fallback strategy
     metadata = {
       base_tag = base_tag,
       total_operations = #resources,
@@ -249,55 +292,52 @@ function tag_mapper_core.plan_tag_operations(
   -- Track which named tags need creation to avoid duplicates
   local tags_to_create = {}
 
-  -- Track errors that occur during individual resource processing
-  local resource_errors = {}
-
-  -- Process each resource
+  -- Process each resource with fallback strategy
   for _, resource in ipairs(resources) do
     if resource.name and resource.tag_spec ~= nil then
-      -- Resolve tag specification for this resource
-      local success, result, _metadata =
-        tag_mapper_core.resolve_tag_specification(
-          resource.tag_spec,
-          base_tag,
-          screen_context
-        )
+      -- Use fallback strategy - always get a resolved tag
+      local resolution, error_obj =
+        resolve_with_fallback(resource.tag_spec, base_tag, screen_context)
 
-      if success then
-        local resolution = result
-        -- Create assignment entry
-        local assignment = {
+      -- Always create assignment (with fallback if needed)
+      local assignment = {
+        resource_id = resource.name,
+        type = resolution.type,
+        resolved_index = resolution.resolved_index,
+        name = resolution.name,
+        overflow = resolution.overflow or false,
+        original_index = resolution.original_index,
+        needs_creation = resolution.needs_creation or false,
+        fallback_used = resolution.fallback_used or false,
+        original_error = resolution.original_error,
+      }
+
+      table.insert(plan.assignments, assignment)
+
+      -- Collect error for metadata if fallback was used
+      if error_obj then
+        error_obj.resource_id = resource.name
+        error_obj.fallback_used = assignment.fallback_used
+        table.insert(plan.errors, error_obj)
+      end
+
+      -- Handle overflow warnings
+      if resolution.overflow then
+        table.insert(plan.warnings, {
+          type = "overflow",
           resource_id = resource.name,
-          type = resolution.type,
-          resolved_index = resolution.resolved_index,
-          name = resolution.name,
-          overflow = resolution.overflow,
           original_index = resolution.original_index,
-          needs_creation = resolution.needs_creation,
-        }
+          final_index = resolution.resolved_index,
+        })
+      end
 
-        table.insert(plan.assignments, assignment)
-
-        -- Handle overflow warnings (only if resolution successful)
-        if resolution.overflow then
-          table.insert(plan.warnings, {
-            type = "overflow",
-            resource_id = resource.name,
-            original_index = resolution.original_index,
-            final_index = resolution.resolved_index,
-          })
-        end
-
-        -- Track named tags that need creation (only if resolution successful)
-        if resolution.type == "named" and resolution.needs_creation then
-          tags_to_create[resolution.name] = true
-        end
-      else
-        -- Handle individual resource error
-        local error_obj = result
-        error_obj.resource_id = resource.name -- Add resource context
-        table.insert(resource_errors, error_obj)
-        -- Continue processing other resources
+      -- Track named tags that need creation (only for successful non-fallback resolutions)
+      if
+        resolution.type == "named"
+        and resolution.needs_creation
+        and not resolution.fallback_used
+      then
+        tags_to_create[resolution.name] = true
       end
     end
   end
@@ -311,21 +351,25 @@ function tag_mapper_core.plan_tag_operations(
     })
   end
 
-  -- Handle resource errors if any occurred
-  if #resource_errors > 0 then
-    -- Add errors to the plan for processing by higher layers
-    plan.errors = resource_errors
-    plan.has_errors = true
-  end
+  -- Always return success unless critical system error
+  plan.has_errors = #plan.errors > 0
 
   local metadata = {
     timing = os.clock() - start_time,
     total_resources = #resources,
     successful_resolutions = #plan.assignments,
-    errors_count = #resource_errors,
+    fallback_count = 0, -- will calculate below
+    errors_count = #plan.errors,
     tags_to_create = #plan.creations,
     warnings_count = #plan.warnings,
   }
+
+  -- Calculate fallback usage statistics
+  for _, assignment in ipairs(plan.assignments) do
+    if assignment.fallback_used then
+      metadata.fallback_count = metadata.fallback_count + 1
+    end
+  end
 
   return true, plan, metadata
 end

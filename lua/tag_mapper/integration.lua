@@ -58,17 +58,15 @@ local function validate_inputs(required_params, provided_params)
   return true
 end
 
--- Helper function to check planning results for errors
-local function should_fail_on_planning_errors(plan, resources)
-  -- Check if plan has errors that should cause complete failure
-  if plan.has_errors and plan.errors and #plan.errors > 0 then
-    -- If all resources have errors (complete failure), return aggregated error
-    if #plan.errors >= #resources then
-      return true, error_reporter.aggregate_errors(plan.errors)
-    end
-    -- If some resources have errors (partial failure), continue with execution
-  end
-  return false, nil
+-- Helper function to check planning results for errors (updated for fallback strategy)
+local function should_fail_on_planning_errors(_plan)
+  -- With fallback strategy, planning never fails completely
+  -- All resources get resolved with fallbacks, errors are in metadata
+  -- Only fail for critical system errors (which would come from core validation)
+
+  -- All errors should be individual resource resolution errors with fallbacks applied
+  -- Continue with execution - errors will be in metadata for user feedback
+  return false, nil -- Never fail with fallback strategy
 end
 
 -- Helper function to handle tag creation failures with structured error support
@@ -192,8 +190,7 @@ function integration.resolve_tags_for_project(resources, base_tag, interface)
   local plan = plan_result
 
   -- Check if plan has errors that should cause complete failure
-  local should_fail, aggregated_error =
-    should_fail_on_planning_errors(plan, resources)
+  local should_fail, aggregated_error = should_fail_on_planning_errors(plan)
   if should_fail then
     return nil, aggregated_error
   end

@@ -27,8 +27,11 @@ local function resolve_assignment_to_tag_object(
     if tag then
       return tag
     else
-      -- Fallback: create mock object for testing with valid index
-      return { name = assignment.name, index = 10 }
+      -- Fallback: use current_tag or tag 1
+      return {
+        name = assignment.name,
+        index = screen_context.current_tag_index or 1,
+      }
     end
   else
     -- For numeric tags (relative/absolute), use the resolved index
@@ -160,7 +163,7 @@ function tag_mapper.resolve_tags_for_project(resources, base_tag, interface)
     integration.resolve_tags_for_project(resources, base_tag, interface)
 
   if not workflow_result then
-    -- Return structured error object directly instead of string
+    -- Critical system error - should be rare with fallback strategy
     if error_obj then
       return false, error_obj
     else
@@ -177,20 +180,18 @@ function tag_mapper.resolve_tags_for_project(resources, base_tag, interface)
     end
   end
 
-  -- Check execution status
-  if workflow_result.execution.metadata.overall_status ~= "success" then
-    local first_failure = workflow_result.execution.failures[1]
-    local error_msg = first_failure and first_failure.error or "unknown error"
-
-    -- Return structured error object instead of string
+  -- With fallback strategy, execution should always succeed
+  -- Errors are now in metadata for user feedback, not operation failure
+  -- Only check for critical execution failures (interface errors, etc.)
+  if not workflow_result.execution then
     local error_reporter = require("diligent.error.reporter").create()
     return false,
       error_reporter.create_tag_resolution_error(
         nil,
         nil,
-        "TAG_CREATION_ERROR",
-        "Tag creation failed: " .. error_msg,
-        { failure = first_failure }
+        "EXECUTION_ERROR",
+        "Critical execution error: no execution results",
+        {}
       )
   end
 
@@ -213,6 +214,7 @@ function tag_mapper.resolve_tags_for_project(resources, base_tag, interface)
   end
 
   -- Return enhanced format: resolved tags for spawning + operation details for feedback
+  -- Include error metadata from fallback strategy for user feedback
   return true,
     {
       resolved_tags = resolved_tags,
@@ -220,6 +222,7 @@ function tag_mapper.resolve_tags_for_project(resources, base_tag, interface)
         created_tags = workflow_result.execution.created_tags,
         assignments = workflow_result.plan.assignments,
         warnings = workflow_result.plan.warnings,
+        errors = workflow_result.plan.errors or {}, -- Include errors from fallback strategy
         metadata = workflow_result.execution.metadata,
         total_created = #workflow_result.execution.created_tags,
       },

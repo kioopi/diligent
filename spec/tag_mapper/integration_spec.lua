@@ -404,11 +404,15 @@ describe("tag_mapper.integration", function()
             dry_run_interface
           )
 
-          -- Should return error from core planning phase
-          assert.is_nil(result)
-          assert.is_table(error_obj)
-          assert.is_string(error_obj.message)
-          assert.is_table(error_obj.suggestions)
+          -- With fallback strategy, should succeed with fallbacks and errors in metadata
+          assert.is_table(result, "Should succeed with fallback strategy")
+          assert.is_nil(error_obj, "Should not have critical error")
+          assert.is_table(result.plan, "Should have plan")
+          assert.is_table(result.plan.errors, "Should have errors in metadata")
+          assert.is_true(
+            #result.plan.errors > 0,
+            "Should have collected errors"
+          )
         end
       )
 
