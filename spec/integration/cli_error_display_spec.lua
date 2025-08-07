@@ -427,12 +427,12 @@ describe("CLI Error Display Integration", function()
         "CLI should format with rich display"
       )
       assert.matches(
-        "✗.*editor.*Tag overflow",
+        "✗.*system.*Critical tag mapper error.*Tag overflow",
         formatted,
         "Should show detailed error"
       )
       assert.matches(
-        "Consider using absolute tag",
+        "Check tag_mapper module integrity",
         formatted,
         "Should show suggestions"
       )

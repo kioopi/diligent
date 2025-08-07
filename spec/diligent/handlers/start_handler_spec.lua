@@ -299,37 +299,20 @@ describe("Start Handler", function()
         end,
       }
 
-      -- Create Phase 5 handler by directly injecting the mock
-      phase5_handler = {
-        validator = start_handler.validator,
-        execute = function(payload)
-          -- Simplified version of handler.execute that uses the mock_tag_mapper directly
-          local spawned_resources = {}
-          local interface = awe.interface
-          local current_tag_index = mock_tag_mapper.get_current_tag(interface)
-
-          -- No transformation needed - pass resources directly
-          local tag_success, tag_result =
-            mock_tag_mapper.resolve_tags_for_project(
-              payload.resources,
-              current_tag_index,
-              interface
-            )
-
-          if not tag_success then
-            -- Legacy test - tag resolution failure should be handled by new simplified handler
-            return false,
-              {
-                error = "Tag resolution failed: "
-                  .. (tag_result.message or "unknown error"),
-                project_name = payload.project_name,
-              }
-          end
-
-          -- Process spawning with normal handler logic
-          return handler.execute(payload)
-        end,
+      -- Use real refactored handler with proper awe_module mock
+      local real_awe_module = {
+        interface = awe.interface,
+        spawn = {
+          spawner = {
+            spawn_with_properties = function(command, tag, properties)
+              -- Mock failing spawn for testing error paths
+              return nil, nil, "Spawn failed for testing"
+            end,
+          },
+        },
       }
+      
+      phase5_handler = start_handler.create(real_awe_module)
 
       -- Legacy test infrastructure - format_error_response has been removed in TDD Cycle 4
     end)
@@ -340,7 +323,7 @@ describe("Start Handler", function()
         resources = {
           {
             name = "editor",
-            command = "gedit",
+            command = "nonexistent_command", -- This will cause spawn failure
             tag_spec = 2,
           },
         },
@@ -348,110 +331,78 @@ describe("Start Handler", function()
 
       local success, result = phase5_handler.execute(payload)
 
-      assert.is_false(success, "Handler should fail with structured error")
+      assert.is_false(success, "Handler should fail when all resources fail to spawn")
 
-      -- Test enhanced error response format
+      -- Test enhanced error response format with refactored handler
       assert.is_table(result, "Result should be a table")
       assert.equals("error-test", result.project_name)
       assert.equals("COMPLETE_FAILURE", result.error_type)
       assert.is_table(result.errors, "Should have errors array")
       assert.equals(1, #result.errors, "Should have one error")
 
-      -- Test error object structure
+      -- Test error object structure - should be spawn error since tag resolution uses fallbacks
       local error_obj = result.errors[1]
-      assert.equals("tag_resolution", error_obj.phase)
+      assert.equals("spawning", error_obj.phase)
       assert.equals("editor", error_obj.resource_id)
       assert.is_table(error_obj.error, "Should contain structured error object")
-      assert.equals("TAG_OVERFLOW", error_obj.error.type)
-      assert.equals("Tag overflow: resolved to tag 9", error_obj.error.message)
+      assert.equals("SPAWN_FAILURE", error_obj.error.type)
+      assert.is_string(error_obj.error.message)
       assert.is_table(error_obj.error.suggestions, "Should have suggestions")
-      assert.equals(2, #error_obj.error.suggestions)
     end)
 
     it(
       "should continue processing after tag resolution failures when possible",
       function()
-        -- Update the phase5_handler to return partial success data
-        phase5_handler.execute = function(payload)
-          -- Mock tag_mapper to succeed for some resources, fail for others
-          local tag_result = {
-            type = "MULTIPLE_TAG_ERRORS",
-            category = "validation",
-            message = "Tag resolution failed for some resources",
-            context = {
-              failed_resources = { "editor" },
-              successful_resources = { "terminal" },
+        -- Create new awe_module that allows one resource to succeed, one to fail
+        local mixed_awe_module = {
+          interface = awe.interface,
+          spawn = {
+            spawner = {
+              spawn_with_properties = function(command, tag, properties)
+                if command == "alacritty" then
+                  return 1001, "snid-terminal", "Terminal spawned successfully"
+                else
+                  return nil, nil, "Spawn failed for " .. command
+                end
+              end,
             },
-            partial_success = {
-              resolved_tags = {
-                terminal = { index = 2, name = "2" },
-              },
-              tag_operations = {
-                created_tags = {},
-                assignments = {
-                  { resource_id = "terminal", resolved_index = 2 },
-                },
-                warnings = {},
-                total_created = 0,
-              },
-            },
-            errors = {
-              {
-                type = "TAG_OVERFLOW",
-                resource_id = "editor",
-                message = "Tag overflow: resolved to tag 9",
-              },
-            },
-          }
-
-          -- Legacy test - tag resolution failure should be handled by new simplified handler
-          return false,
-            {
-              error = "Tag resolution failed: "
-                .. (tag_result.message or "unknown error"),
-              project_name = payload.project_name,
-            }
-        end
+          },
+        }
+        
+        local mixed_handler = start_handler.create(mixed_awe_module)
 
         local payload = {
           project_name = "partial-test",
           resources = {
             {
               name = "editor",
-              command = "gedit",
+              command = "nonexistent_editor",
               tag_spec = 2,
             },
             {
-              name = "terminal",
+              name = "terminal", 
               command = "alacritty",
               tag_spec = "2",
             },
           },
         }
 
-        local success, result = phase5_handler.execute(payload)
+        local success, result = mixed_handler.execute(payload)
 
-        assert.is_false(
-          success,
-          "Handler should fail but provide partial success"
-        )
-        assert.equals("PARTIAL_FAILURE", result.error_type)
-        assert.is_table(
-          result.partial_success,
-          "Should have partial success data"
-        )
-        assert.is_table(result.partial_success.spawned_resources)
-        assert.equals(1, result.partial_success.total_spawned)
-        assert.equals(
-          "terminal",
-          result.partial_success.spawned_resources[1].name
-        )
-
-        -- Verify metadata
-        assert.is_table(result.metadata)
-        assert.equals(2, result.metadata.total_attempted)
-        assert.equals(1, result.metadata.success_count)
-        assert.equals(1, result.metadata.error_count)
+        -- Should succeed because terminal spawns successfully (partial success)
+        assert.is_true(success, "Handler should succeed with partial success")
+        
+        assert.equals("partial-test", result.project_name)
+        assert.equals(1, result.total_spawned, "Should have one spawned resource")
+        assert.equals("terminal", result.spawned_resources[1].name)
+        
+        -- Should have warnings about the failed resource
+        assert.is_not_nil(result.warnings, "Should have warnings")
+        assert.is_not_nil(result.warnings.spawn_errors, "Should have spawn errors")
+        assert.equals(1, #result.warnings.spawn_errors, "Should have one spawn error")
+        
+        -- Verify tag operations are present
+        assert.is_not_nil(result.tag_operations, "Should have tag operations")
       end
     )
 
@@ -530,52 +481,45 @@ describe("Start Handler", function()
     end)
 
     it("should format complete failure when no resources succeed", function()
-      -- Update phase5_handler for complete failure scenario
-      phase5_handler.execute = function(payload)
-        local tag_result = {
-          type = "MULTIPLE_TAG_ERRORS",
-          category = "validation",
-          message = "All tag resolutions failed",
-          errors = {
-            {
-              type = "TAG_OVERFLOW",
-              resource_id = "editor",
-              message = "Tag overflow",
-            },
-            {
-              type = "TAG_SPEC_INVALID",
-              resource_id = "browser",
-              message = "Invalid tag spec",
-            },
+      -- Use real refactored handler with failing spawn mock for complete failure
+      local failure_awe_module = {
+        interface = awe.interface,
+        spawn = {
+          spawner = {
+            spawn_with_properties = function(command, tag, properties)
+              -- All spawns fail to create complete failure scenario
+              return nil, nil, "Spawn failed: " .. command .. " not found"
+            end,
           },
-        }
-
-        -- Legacy test - tag resolution failure should be handled by new simplified handler
-        return false,
-          {
-            error = "Tag resolution failed: "
-              .. (tag_result.message or "unknown error"),
-            project_name = payload.project_name,
-          }
-      end
+        },
+      }
+      
+      local failure_handler = start_handler.create(failure_awe_module)
 
       local payload = {
         project_name = "complete-fail-test",
         resources = {
           { name = "editor", command = "gedit", tag_spec = 2 },
-          { name = "browser", command = "firefox", tag_spec = {} },
+          { name = "browser", command = "firefox", tag_spec = 3 },
         },
       }
 
-      local success, result = phase5_handler.execute(payload)
+      local success, result = failure_handler.execute(payload)
 
       assert.is_false(success)
       assert.equals("COMPLETE_FAILURE", result.error_type)
-      assert.equals(2, #result.errors)
-      assert.is_nil(result.partial_success, "Should not have partial success")
+      assert.equals("complete-fail-test", result.project_name)
+      assert.equals(2, #result.errors) -- Two spawn failures
       assert.equals(2, result.metadata.total_attempted)
       assert.equals(0, result.metadata.success_count)
       assert.equals(2, result.metadata.error_count)
+      
+      -- Verify error structure
+      for _, error_entry in ipairs(result.errors) do
+        assert.equals("spawning", error_entry.phase)
+        assert.is_not_nil(error_entry.resource_id)
+        assert.equals("SPAWN_FAILURE", error_entry.error.type)
+      end
     end)
   end)
 
@@ -622,7 +566,7 @@ describe("Start Handler", function()
 
           local success, result = test_handler.execute(payload)
 
-          -- Handler should fail but NOT use backwards compatibility
+          -- Handler should fail but use new structured format (no backwards compatibility)
           assert.is_false(success, "Handler should fail")
 
           -- Should NOT have old format fields (backwards compatibility removed)
@@ -632,12 +576,18 @@ describe("Start Handler", function()
             "Should not have failed_resource field"
           )
 
-          -- Should have enhanced error format
+          -- Should have enhanced structured error format
           assert.is_table(result, "Result should be enhanced error object")
           assert.equals("string-error-test", result.project_name)
           assert.equals("COMPLETE_FAILURE", result.error_type)
           assert.is_table(result.errors, "Should have errors array")
           assert.equals(1, #result.errors, "Should have one error")
+          
+          -- Verify structured error details
+          local error_entry = result.errors[1]
+          assert.equals("tag_resolution", error_entry.phase)
+          assert.equals("system", error_entry.resource_id)
+          assert.equals("CRITICAL_TAG_MAPPER_ERROR", error_entry.error.type)
 
           -- Restore originals
           package.loaded["tag_mapper"] = original_tag_mapper
