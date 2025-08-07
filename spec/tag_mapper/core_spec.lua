@@ -34,51 +34,56 @@ describe("tag_mapper.core", function()
     end)
 
     it("should resolve relative offset 0 to base tag", function()
-      local result =
+      local result, metadata = assert.success(
         tag_mapper_core.resolve_tag_specification(0, 3, mock_screen_context)
+      )
 
-      assert.is_table(result)
       assert.are.equal("relative", result.type)
       assert.are.equal(3, result.resolved_index)
       assert.is_false(result.overflow)
       assert.is_nil(result.name)
+      assert.is_table(metadata)
     end)
 
     it("should resolve relative offset 1 to base tag + 1", function()
-      local result =
+      local result, metadata = assert.success(
         tag_mapper_core.resolve_tag_specification(1, 3, mock_screen_context)
+      )
 
-      assert.is_table(result)
       assert.are.equal("relative", result.type)
       assert.are.equal(4, result.resolved_index)
       assert.is_false(result.overflow)
+      assert.is_table(metadata)
     end)
 
     it("should resolve relative offset 2 to base tag + 2", function()
-      local result =
+      local result, metadata = assert.success(
         tag_mapper_core.resolve_tag_specification(2, 3, mock_screen_context)
+      )
 
-      assert.is_table(result)
+      assert.is_table(metadata)
       assert.are.equal("relative", result.type)
       assert.are.equal(5, result.resolved_index)
       assert.is_false(result.overflow)
     end)
 
     it("should handle negative offsets by using tag 1", function()
-      local result =
+      local result = assert.success(
         tag_mapper_core.resolve_tag_specification(-2, 1, mock_screen_context)
+      )
 
-      assert.is_table(result)
       assert.are.equal("relative", result.type)
       assert.are.equal(1, result.resolved_index)
       assert.is_false(result.overflow)
     end)
 
     it("should detect overflow and cap at tag 9", function()
-      local result =
+      local result, meta = assert.success(
         tag_mapper_core.resolve_tag_specification(2, 8, mock_screen_context)
+      )
 
       assert.is_table(result)
+      assert.is_table(meta)
       assert.are.equal("relative", result.type)
       assert.are.equal(9, result.resolved_index)
       assert.is_true(result.overflow)
@@ -86,8 +91,9 @@ describe("tag_mapper.core", function()
     end)
 
     it("should resolve digit string to absolute numeric tag", function()
-      local result =
+      local result = assert.success(
         tag_mapper_core.resolve_tag_specification("5", 3, mock_screen_context)
+      )
 
       assert.is_table(result)
       assert.are.equal("absolute", result.type)
@@ -96,8 +102,9 @@ describe("tag_mapper.core", function()
     end)
 
     it("should resolve digit string with overflow to tag 9", function()
-      local result =
+      local result = assert.success(
         tag_mapper_core.resolve_tag_specification("15", 3, mock_screen_context)
+      )
 
       assert.is_table(result)
       assert.are.equal("absolute", result.type)
@@ -107,10 +114,12 @@ describe("tag_mapper.core", function()
     end)
 
     it("should resolve named tag that exists in screen context", function()
-      local result = tag_mapper_core.resolve_tag_specification(
-        "editor",
-        3,
-        mock_screen_context
+      local result = assert.success(
+        tag_mapper_core.resolve_tag_specification(
+          "editor",
+          3,
+          mock_screen_context
+        )
       )
 
       assert.is_table(result)
@@ -121,10 +130,12 @@ describe("tag_mapper.core", function()
     end)
 
     it("should resolve named tag that doesn't exist", function()
-      local result = tag_mapper_core.resolve_tag_specification(
-        "logs",
-        3,
-        mock_screen_context
+      local result = assert.success(
+        tag_mapper_core.resolve_tag_specification(
+          "logs",
+          3,
+          mock_screen_context
+        )
       )
 
       assert.is_table(result)
@@ -135,51 +146,42 @@ describe("tag_mapper.core", function()
     end)
 
     it("should handle nil tag spec", function()
-      local success, result = pcall(function()
-        return tag_mapper_core.resolve_tag_specification(
-          nil,
-          3,
-          mock_screen_context
-        )
-      end)
+      local error_obj = assert.no.success(
+        tag_mapper_core.resolve_tag_specification(nil, 3, mock_screen_context)
+      )
 
-      assert.is_false(success)
-      assert.matches("tag spec is required", result)
+      assert.is_nil(result)
+      assert.is_table(error_obj)
+      assert.matches("tag spec is required", error_obj.message)
     end)
 
     it("should handle nil base tag", function()
-      local success, result = pcall(function()
-        return tag_mapper_core.resolve_tag_specification(
-          0,
-          nil,
-          mock_screen_context
-        )
-      end)
+      local error_obj = assert.no.success(
+        tag_mapper_core.resolve_tag_specification(0, nil, mock_screen_context)
+      )
 
-      assert.is_false(success)
-      assert.matches("base tag is required", result)
+      assert.is_nil(result)
+      assert.is_table(error_obj)
+      assert.matches("base tag is required", error_obj.message)
     end)
 
     it("should handle nil screen context", function()
-      local success, result = pcall(function()
-        return tag_mapper_core.resolve_tag_specification(0, 3, nil)
-      end)
+      local error_obj =
+        assert.no.success(tag_mapper_core.resolve_tag_specification(0, 3, nil))
 
-      assert.is_false(success)
-      assert.matches("screen context is required", result)
+      assert.is_nil(result)
+      assert.is_table(error_obj)
+      assert.matches("screen context is required", error_obj.message)
     end)
 
     it("should handle invalid tag spec type", function()
-      local success, result = pcall(function()
-        return tag_mapper_core.resolve_tag_specification(
-          {},
-          3,
-          mock_screen_context
-        )
-      end)
+      local error_obj = assert.no.success(
+        tag_mapper_core.resolve_tag_specification({}, 3, mock_screen_context)
+      )
 
-      assert.is_false(success)
-      assert.matches("invalid tag spec type", result)
+      assert.is_nil(result)
+      assert.is_table(error_obj)
+      assert.matches("invalid tag spec type", error_obj.message)
     end)
   end)
 
@@ -203,36 +205,38 @@ describe("tag_mapper.core", function()
         tag_count = 6,
       }
 
-      -- Create mock resources
+      -- Create mock resources with new format
       mock_resources = {
         {
-          id = "resource_1",
-          tag = 0, -- relative: current tag
+          name = "resource_1",
+          tag_spec = 0, -- relative: current tag
         },
         {
-          id = "resource_2",
-          tag = 1, -- relative: current tag + 1
+          name = "resource_2",
+          tag_spec = 1, -- relative: current tag + 1
         },
         {
-          id = "resource_3",
-          tag = "5", -- absolute: tag 5
+          name = "resource_3",
+          tag_spec = "5", -- absolute: tag 5
         },
         {
-          id = "resource_4",
-          tag = "editor", -- existing named tag
+          name = "resource_4",
+          tag_spec = "editor", -- existing named tag
         },
         {
-          id = "resource_5",
-          tag = "logs", -- new named tag
+          name = "resource_5",
+          tag_spec = "logs", -- new named tag
         },
       }
     end)
 
     it("should create operation plan for mixed tag types", function()
-      local plan = tag_mapper_core.plan_tag_operations(
-        mock_resources,
-        mock_screen_context,
-        3
+      local plan = assert.success(
+        tag_mapper_core.plan_tag_operations(
+          mock_resources,
+          mock_screen_context,
+          3
+        )
       )
 
       assert.is_table(plan)
@@ -283,19 +287,21 @@ describe("tag_mapper.core", function()
     it("should handle overflow warnings", function()
       local overflow_resources = {
         {
-          id = "overflow_1",
-          tag = 8, -- base 3 + 8 = 11, should overflow to 9
+          name = "overflow_1",
+          tag_spec = 8, -- base 3 + 8 = 11, should overflow to 9
         },
         {
-          id = "overflow_2",
-          tag = "15", -- absolute 15, should overflow to 9
+          name = "overflow_2",
+          tag_spec = "15", -- absolute 15, should overflow to 9
         },
       }
 
-      local plan = tag_mapper_core.plan_tag_operations(
-        overflow_resources,
-        mock_screen_context,
-        3
+      local plan = assert.success(
+        tag_mapper_core.plan_tag_operations(
+          overflow_resources,
+          mock_screen_context,
+          3
+        )
       )
 
       assert.is_table(plan)
@@ -319,8 +325,9 @@ describe("tag_mapper.core", function()
     end)
 
     it("should handle empty resource list", function()
-      local plan =
+      local plan = assert.success(
         tag_mapper_core.plan_tag_operations({}, mock_screen_context, 3)
+      )
 
       assert.is_table(plan)
       assert.are.equal(0, #plan.assignments)
@@ -332,19 +339,21 @@ describe("tag_mapper.core", function()
     it("should optimize duplicate tag creations", function()
       local duplicate_resources = {
         {
-          id = "resource_1",
-          tag = "project_logs",
+          name = "resource_1",
+          tag_spec = "project_logs",
         },
         {
-          id = "resource_2",
-          tag = "project_logs", -- same tag name
+          name = "resource_2",
+          tag_spec = "project_logs", -- same tag name
         },
       }
 
-      local plan = tag_mapper_core.plan_tag_operations(
-        duplicate_resources,
-        mock_screen_context,
-        3
+      local plan = assert.success(
+        tag_mapper_core.plan_tag_operations(
+          duplicate_resources,
+          mock_screen_context,
+          3
+        )
       )
 
       assert.is_table(plan)
@@ -358,34 +367,179 @@ describe("tag_mapper.core", function()
     end)
 
     it("should handle nil resources", function()
-      local success, result = pcall(function()
-        return tag_mapper_core.plan_tag_operations(nil, mock_screen_context, 3)
-      end)
+      local error_obj = assert.no.success(
+        tag_mapper_core.plan_tag_operations(nil, mock_screen_context, 3)
+      )
 
-      assert.is_false(success)
-      assert.matches("resources list is required", result)
+      assert.matches("resources list is required", error_obj.message)
     end)
 
     it("should handle nil screen context", function()
-      local success, result = pcall(function()
-        return tag_mapper_core.plan_tag_operations(mock_resources, nil, 3)
-      end)
+      local error_obj = assert.no.success(
+        tag_mapper_core.plan_tag_operations(mock_resources, nil, 3)
+      )
 
-      assert.is_false(success)
-      assert.matches("screen context is required", result)
+      assert.matches("screen context is required", error_obj.message)
     end)
 
     it("should handle nil base tag", function()
-      local success, result = pcall(function()
-        return tag_mapper_core.plan_tag_operations(
+      local error_obj = assert.no.success(
+        tag_mapper_core.plan_tag_operations(
           mock_resources,
           mock_screen_context,
           nil
         )
-      end)
+      )
 
-      assert.is_false(success)
-      assert.matches("base tag is required", result)
+      assert.matches("base tag is required", error_obj.message)
     end)
+  end)
+
+  -- NEW: Tests for return-based error handling (TDD Cycle 2)
+  describe("resolve_tag_specification error handling", function()
+    local mock_screen_context
+
+    before_each(function()
+      mock_screen_context = {
+        screen = { name = "mock_screen" },
+        current_tag_index = 3,
+        available_tags = {},
+        tag_count = 9,
+      }
+    end)
+
+    it("should return error object for nil tag_spec", function()
+      local error_obj = assert.no.success(
+        tag_mapper_core.resolve_tag_specification(nil, 3, mock_screen_context)
+      )
+
+      assert.are.equal("TAG_SPEC_INVALID", error_obj.type)
+      assert.matches("tag spec is required", error_obj.message)
+      assert.is_table(error_obj.suggestions)
+      assert.is_table(error_obj.context)
+    end)
+
+    it("should return error object for nil base_tag", function()
+      local error_obj = assert.no.success(
+        tag_mapper_core.resolve_tag_specification(2, nil, mock_screen_context)
+      )
+
+      assert.are.equal("TAG_SPEC_INVALID", error_obj.type)
+      assert.matches("base tag is required", error_obj.message)
+      assert.is_table(error_obj.suggestions)
+    end)
+
+    it("should return error object for invalid base_tag type", function()
+      local error_obj = assert.no.success(
+        tag_mapper_core.resolve_tag_specification(
+          2,
+          "invalid",
+          mock_screen_context
+        )
+      )
+
+      assert.are.equal("TAG_SPEC_INVALID", error_obj.type)
+      assert.matches("base tag must be a number", error_obj.message)
+    end)
+
+    it("should return error object for nil screen_context", function()
+      local error_obj =
+        assert.no.success(tag_mapper_core.resolve_tag_specification(2, 3, nil))
+
+      assert.are.equal("TAG_SPEC_INVALID", error_obj.type)
+      assert.matches("screen context is required", error_obj.message)
+    end)
+
+    it("should return error object for invalid tag_spec type", function()
+      local error_obj = assert.no.success(
+        tag_mapper_core.resolve_tag_specification(
+          { invalid = true },
+          3,
+          mock_screen_context
+        )
+      )
+
+      assert.are.equal("TAG_SPEC_INVALID", error_obj.type)
+      assert.matches("invalid tag spec type", error_obj.message)
+      assert.is_table(error_obj.suggestions)
+
+      -- Should suggest valid tag spec formats
+      local has_format_suggestion = false
+      for _, suggestion in ipairs(error_obj.suggestions) do
+        if suggestion:match("number.*or.*string") then
+          has_format_suggestion = true
+          break
+        end
+      end
+      assert.is_true(has_format_suggestion)
+    end)
+  end)
+
+  describe("plan_tag_operations error handling", function()
+    local mock_screen_context
+
+    before_each(function()
+      mock_screen_context = {
+        screen = { name = "mock_screen" },
+        current_tag_index = 3,
+        available_tags = {},
+        tag_count = 9,
+      }
+    end)
+
+    it("should return error object for nil resources", function()
+      local error_obj = assert.no.success(
+        tag_mapper_core.plan_tag_operations(nil, mock_screen_context, 3)
+      )
+
+      assert.is_nil(result)
+      assert.is_table(error_obj)
+      assert.are.equal("TAG_SPEC_INVALID", error_obj.type)
+      assert.matches("resources list is required", error_obj.message)
+    end)
+
+    it("should return error object for nil screen_context", function()
+      local error_obj =
+        assert.no.success(tag_mapper_core.plan_tag_operations({}, nil, 3))
+
+      assert.are.equal("TAG_SPEC_INVALID", error_obj.type)
+      assert.matches("screen context is required", error_obj.message)
+    end)
+
+    it("should return error object for nil base_tag", function()
+      local error_obj = assert.no.success(
+        tag_mapper_core.plan_tag_operations({}, mock_screen_context, nil)
+      )
+
+      assert.are.equal("TAG_SPEC_INVALID", error_obj.type)
+      assert.matches("base tag is required", error_obj.message)
+    end)
+
+    it(
+      "should handle individual resource errors and continue processing",
+      function()
+        local resources = {
+          { name = "valid", tag_spec = 1 },
+          { name = "invalid", tag_spec = { bad = "spec" } },
+          { name = "also_valid", tag_spec = 2 },
+        }
+
+        local success, result =
+          tag_mapper_core.plan_tag_operations(resources, mock_screen_context, 3)
+
+        -- Should return partial plan with error information
+        if success then
+          -- Should have assignments for valid resources
+          assert.is_table(result.assignments)
+          -- Should have error information for invalid resource
+          assert.is_table(result.errors)
+          assert.is_true(#result.errors > 0)
+        else
+          -- Or return aggregated error if critical failure
+          assert.is_table(result)
+          assert.matches("invalid.*resource", result.message:lower())
+        end
+      end
+    )
   end)
 end)

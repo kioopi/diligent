@@ -51,6 +51,35 @@ describe("tag_mapper", function()
       assert.are.equal(5, result.index)
     end)
 
+    it(
+      "should resolve relative tags from current tag (bug fix verification)",
+      function()
+        -- BUG FIX TEST: User on tag 2 + offset 2 = tag 4 (not tag 3)
+        -- This verifies the fix where relative tags resolve from user's current tag,
+        -- not hardcoded tag 1 as in the original bug
+        local success, result = tag_mapper.resolve_tag(2, 2, mock_interface)
+
+        assert.is_true(success)
+        assert.is_table(result)
+        assert.are.equal(4, result.index)
+        assert.are.equal("4", result.name)
+      end
+    )
+
+    it("should handle different base tag scenarios", function()
+      -- Additional verification with different starting positions
+
+      -- User on tag 1 + offset 3 = tag 4
+      local success1, result1 = tag_mapper.resolve_tag(3, 1, mock_interface)
+      assert.is_true(success1)
+      assert.are.equal(4, result1.index)
+
+      -- User on tag 5 + offset 1 = tag 6
+      local success2, result2 = tag_mapper.resolve_tag(1, 5, mock_interface)
+      assert.is_true(success2)
+      assert.are.equal(6, result2.index)
+    end)
+
     it("should handle overflow by placing on tag 9", function()
       -- Current tag is 8, offset 2 would be 10, should overflow to 9
       local success, result = tag_mapper.resolve_tag(2, 8, mock_interface)
@@ -247,6 +276,369 @@ describe("tag_mapper", function()
         assert.is_table(result)
         assert.are.equal(test_case.expected, result.index)
       end
+    end)
+
+    it("should handle boundary conditions correctly", function()
+      -- Test boundary conditions for 1-9 tag range
+      local boundary_cases = {
+        -- Edge of range - tag 1
+        { base = 1, offset = 0, expected = 1 }, -- current tag 1
+        { base = 1, offset = 8, expected = 9 }, -- tag 1 + 8 = tag 9 (max)
+
+        -- Edge of range - tag 9
+        { base = 9, offset = 0, expected = 9 }, -- current tag 9
+        { base = 9, offset = 1, expected = 9 }, -- tag 9 + 1 = overflow to 9
+
+        -- Mid-range variations
+        { base = 4, offset = 3, expected = 7 }, -- tag 4 + 3 = tag 7
+        { base = 6, offset = 2, expected = 8 }, -- tag 6 + 2 = tag 8
+      }
+
+      for _, test_case in ipairs(boundary_cases) do
+        local success, result = tag_mapper.resolve_tag(
+          test_case.offset,
+          test_case.base,
+          mock_interface
+        )
+        assert.is_true(
+          success,
+          "Failed for base=" .. test_case.base .. " offset=" .. test_case.offset
+        )
+        assert.are.equal(
+          test_case.expected,
+          result.index,
+          "Expected "
+            .. test_case.expected
+            .. " for base="
+            .. test_case.base
+            .. " offset="
+            .. test_case.offset
+            .. ", got "
+            .. result.index
+        )
+      end
+    end)
+
+    it("should handle mixed tag types in sequence", function()
+      -- Test resolving different tag types from the same base
+      local base_tag = 3
+      local mixed_specs = {
+        { spec = 0, type = "relative", expected_index = 3 }, -- current
+        { spec = 2, type = "relative", expected_index = 5 }, -- +2
+        { spec = "7", type = "absolute", expected_index = 7 }, -- absolute
+        { spec = "workspace", type = "named", expected_name = "workspace" },
+      }
+
+      for _, test_case in ipairs(mixed_specs) do
+        local success, result =
+          tag_mapper.resolve_tag(test_case.spec, base_tag, mock_interface)
+        assert.is_true(success)
+
+        if test_case.expected_index then
+          assert.are.equal(test_case.expected_index, result.index)
+        end
+        if test_case.expected_name then
+          assert.are.equal(test_case.expected_name, result.name)
+        end
+      end
+    end)
+  end)
+
+  describe("resolve_tags_for_project (New Batch API)", function()
+    describe("enhanced return format", function()
+      it("should return resolved tags and operation details", function()
+        local resources = {
+          { name = "vim", tag_spec = 2 },
+          { name = "browser", tag_spec = "editor" },
+        }
+        local success, result =
+          tag_mapper.resolve_tags_for_project(resources, 3, mock_interface)
+
+        assert.is_true(success)
+        assert.is_not_nil(result.resolved_tags)
+        assert.is_not_nil(result.tag_operations)
+
+        -- Check resolved tags for spawning
+        assert.equals(5, result.resolved_tags.vim.index) -- base 3 + offset 2
+        assert.equals("editor", result.resolved_tags.browser.name)
+
+        -- Check operation details for user feedback
+        assert.is_table(result.tag_operations.created_tags)
+        assert.is_table(result.tag_operations.assignments)
+        assert.is_table(result.tag_operations.warnings)
+        assert.is_number(result.tag_operations.total_created)
+      end)
+
+      it("should handle mixed tag types in batch", function()
+        local resources = {
+          { name = "relative_tag", tag_spec = 1 }, -- relative: base + 1
+          { name = "absolute_tag", tag_spec = "7" }, -- absolute: tag 7
+          { name = "named_tag", tag_spec = "project" }, -- named: create new
+          { name = "existing_tag", tag_spec = "test" }, -- named: existing
+        }
+        local success, result =
+          tag_mapper.resolve_tags_for_project(resources, 4, mock_interface)
+
+        assert.is_true(success)
+
+        -- Verify resolved tags
+        assert.equals(5, result.resolved_tags.relative_tag.index) -- 4 + 1
+        assert.equals(7, result.resolved_tags.absolute_tag.index)
+        assert.equals("project", result.resolved_tags.named_tag.name)
+        assert.equals("test", result.resolved_tags.existing_tag.name)
+        assert.equals(2, result.resolved_tags.existing_tag.index) -- from mock
+
+        -- Verify operation details
+        assert.is_table(result.tag_operations.assignments)
+        assert.equals(4, #result.tag_operations.assignments) -- 4 resources
+      end)
+
+      it("should optimize duplicate named tag creation", function()
+        local resources = {
+          { name = "app1", tag_spec = "shared_workspace" },
+          { name = "app2", tag_spec = "shared_workspace" },
+          { name = "app3", tag_spec = "shared_workspace" },
+        }
+        local success, result =
+          tag_mapper.resolve_tags_for_project(resources, 2, mock_interface)
+
+        assert.is_true(success)
+
+        -- All should resolve to the same tag
+        local shared_tag = result.resolved_tags.app1
+        assert.equals(shared_tag.name, result.resolved_tags.app2.name)
+        assert.equals(shared_tag.name, result.resolved_tags.app3.name)
+
+        -- Should only create tag once
+        assert.equals(1, result.tag_operations.total_created)
+      end)
+    end)
+
+    describe("error handling", function()
+      it("should succeed with fallback when tag creation fails", function()
+        -- Create a failing mock interface
+        local failing_interface = {
+          get_screen_context = function()
+            return {
+              screen = { index = 1 },
+              current_tag_index = 3,
+              available_tags = {},
+              tag_count = 0,
+            }
+          end,
+          create_named_tag = function(name)
+            return nil
+          end, -- Simulate failure
+          find_tag_by_name = function(name)
+            return nil
+          end,
+        }
+
+        local resources = { { name = "test", tag_spec = "failing_tag" } }
+        local success, result =
+          tag_mapper.resolve_tags_for_project(resources, 3, failing_interface)
+
+        -- With fallback strategy, should succeed despite tag creation failure
+        assert.is_true(success, "should succeed with fallback strategy")
+        assert.is_table(result.resolved_tags, "should have resolved tags")
+        assert.is_not_nil(
+          result.resolved_tags.test,
+          "should have fallback tag for test"
+        )
+
+        -- Should fallback to current_tag (3) when tag creation fails
+        assert.equals(
+          3,
+          result.resolved_tags.test.index,
+          "should fallback to current_tag"
+        )
+        assert.equals(
+          "failing_tag",
+          result.resolved_tags.test.name,
+          "should preserve tag name"
+        )
+      end)
+
+      it("should handle interface validation errors", function()
+        local resources = { { name = "test", tag_spec = 2 } }
+        local success, error_msg =
+          tag_mapper.resolve_tags_for_project(resources, 3, nil)
+
+        assert.is_false(success)
+        assert.is_string(error_msg)
+        assert.matches("interface is required", error_msg)
+      end)
+
+      it("should handle empty resources list", function()
+        local success, result =
+          tag_mapper.resolve_tags_for_project({}, 3, mock_interface)
+
+        assert.is_true(success)
+        assert.is_table(result.resolved_tags)
+        assert.is_table(result.tag_operations)
+        assert.equals(0, result.tag_operations.total_created)
+      end)
+    end)
+  end)
+
+  describe("resolve_tag backward compatibility (Phase 2)", function()
+    it("should work exactly as before after refactor", function()
+      -- Test various scenarios that must continue working
+      local test_cases = {
+        { tag_spec = 2, base_tag = 3, expected_index = 5 }, -- relative
+        { tag_spec = "7", base_tag = 2, expected_index = 7 }, -- absolute
+        {
+          tag_spec = "test",
+          base_tag = 3,
+          expected_name = "test",
+          expected_index = 2,
+        }, -- existing named
+        { tag_spec = "new_tag", base_tag = 3, expected_name = "new_tag" }, -- new named
+      }
+
+      for _, test_case in ipairs(test_cases) do
+        local success, tag = tag_mapper.resolve_tag(
+          test_case.tag_spec,
+          test_case.base_tag,
+          mock_interface
+        )
+        assert.is_true(
+          success,
+          "resolve_tag should succeed for " .. tostring(test_case.tag_spec)
+        )
+        assert.is_table(tag, "resolve_tag should return tag object")
+
+        if test_case.expected_index then
+          assert.equals(test_case.expected_index, tag.index)
+        end
+
+        if test_case.expected_name then
+          assert.equals(test_case.expected_name, tag.name)
+        end
+      end
+    end)
+
+    it("should handle errors the same way after refactor", function()
+      -- Test error scenarios that must continue working
+      local error_cases = {
+        {
+          tag_spec = nil,
+          base_tag = 3,
+          expected_error = "tag spec is required",
+        },
+        {
+          tag_spec = 2,
+          base_tag = nil,
+          expected_error = "base tag is required",
+        },
+        {
+          tag_spec = 2,
+          base_tag = "invalid",
+          expected_error = "base tag must be a number",
+        },
+      }
+
+      for _, test_case in ipairs(error_cases) do
+        local success, error = tag_mapper.resolve_tag(
+          test_case.tag_spec,
+          test_case.base_tag,
+          mock_interface
+        )
+        assert.is_false(success, "resolve_tag should fail for invalid input")
+        assert.is_string(error, "resolve_tag should return error message")
+        assert.matches(test_case.expected_error, error)
+      end
+    end)
+
+    it("should maintain exact same return format after refactor", function()
+      -- Verify the return objects have the same structure
+      local success, tag = tag_mapper.resolve_tag(1, 3, mock_interface)
+
+      assert.is_true(success)
+      assert.is_table(tag)
+      assert.is_number(tag.index)
+      assert.is_string(tag.name)
+
+      -- Verify no extra fields were added
+      local expected_fields = { "index", "name" }
+      for field_name, _ in pairs(tag) do
+        local found = false
+        for _, expected in ipairs(expected_fields) do
+          if field_name == expected then
+            found = true
+            break
+          end
+        end
+        assert.is_true(found, "Unexpected field in tag object: " .. field_name)
+      end
+    end)
+  end)
+
+  describe("DSL compatibility wrappers", function()
+    describe("validate_tag_spec", function()
+      it("should validate valid numeric tag specs", function()
+        local success, error = tag_mapper.validate_tag_spec(2)
+        assert.is_true(success)
+        assert.is_nil(error)
+      end)
+
+      it("should validate valid string tag specs", function()
+        local success, error = tag_mapper.validate_tag_spec("3")
+        assert.is_true(success)
+        assert.is_nil(error)
+      end)
+
+      it("should validate valid named tag specs", function()
+        local success, error = tag_mapper.validate_tag_spec("editor")
+        assert.is_true(success)
+        assert.is_nil(error)
+      end)
+
+      it("should reject invalid tag spec types", function()
+        local success, error = tag_mapper.validate_tag_spec(true)
+        assert.is_false(success)
+        assert.is_string(error)
+      end)
+
+      it("should reject nil tag specs", function()
+        local success, error = tag_mapper.validate_tag_spec(nil)
+        assert.is_false(success)
+        assert.is_string(error)
+      end)
+    end)
+
+    describe("describe_tag_spec", function()
+      it("should describe relative tag specs", function()
+        assert.are.equal(
+          "current tag (relative offset 0)",
+          tag_mapper.describe_tag_spec(0)
+        )
+        assert.are.equal("relative offset +2", tag_mapper.describe_tag_spec(2))
+      end)
+
+      it("should describe absolute tag specs", function()
+        assert.are.equal("absolute tag 3", tag_mapper.describe_tag_spec("3"))
+        assert.are.equal("absolute tag 9", tag_mapper.describe_tag_spec("9"))
+      end)
+
+      it("should describe named tag specs", function()
+        assert.are.equal(
+          "named tag 'editor'",
+          tag_mapper.describe_tag_spec("editor")
+        )
+        assert.are.equal(
+          "named tag 'browser'",
+          tag_mapper.describe_tag_spec("browser")
+        )
+      end)
+
+      it("should handle invalid tag specs", function()
+        assert.are.equal("invalid tag spec", tag_mapper.describe_tag_spec(nil))
+        assert.are.equal(
+          "invalid tag spec type: boolean",
+          tag_mapper.describe_tag_spec(true)
+        )
+      end)
     end)
   end)
 end)

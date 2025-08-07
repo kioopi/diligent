@@ -22,14 +22,12 @@ local interfaces = require("awe.interfaces")
 local create_client = require("awe.client")
 local create_spawn = require("awe.spawn")
 local create_error = require("awe.error")
-local create_tag = require("awe.tag")
 
 local awe = {
   -- Default instance with awesome_interface
   client = create_client(interfaces.awesome_interface),
   spawn = create_spawn(interfaces.awesome_interface),
   error = create_error.create(interfaces.awesome_interface),
-  tag = create_tag(interfaces.awesome_interface),
 
   -- Direct access to interfaces
   interfaces = interfaces,
@@ -50,8 +48,8 @@ function awe.create(interface)
     client = create_client(interface),
     spawn = create_spawn(interface),
     error = create_error.create(interface),
-    tag = create_tag(interface),
     interfaces = interfaces,
+    interface = interface, -- Expose the interface used to create this instance
   }
 end
 

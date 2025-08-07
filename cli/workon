@@ -32,6 +32,7 @@ end)
 
 cli:command("ping", "Test communication with AwesomeWM"):file("cli/commands/ping.lua")
 cli:command("validate", "Validate project files"):file("cli/commands/validate.lua")
+cli:command("start", "Start project workspaces"):file("cli/commands/start.lua")
 
 -- Parse and execute
 local args, err = cli:parse(arg)

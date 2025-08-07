@@ -98,7 +98,35 @@ dsl.validator = validator
 -- Export helper system for extensibility
 dsl.helpers = require("dsl.helpers.init")
 
--- Export tag specification parser
-dsl.tag_spec = require("dsl.tag_spec")
+-- Export tag specification functions via tag_mapper
+local tag_mapper = require("tag_mapper")
+dsl.tag_spec = {
+  validate = tag_mapper.validate_tag_spec,
+  describe = tag_mapper.describe_tag_spec,
+  -- Simplified parse function - just validates and returns basic type info
+  parse = function(tag_value)
+    local success, error = tag_mapper.validate_tag_spec(tag_value)
+    if not success then
+      return false, error
+    end
+
+    -- Return simple type classification
+    local tag_type = type(tag_value)
+    if tag_type == "number" then
+      return true, { type = "relative", value = tag_value }
+    elseif tag_type == "string" then
+      local numeric_value = tonumber(tag_value)
+      if numeric_value then
+        return true, { type = "absolute", value = numeric_value }
+      else
+        return true, { type = "named", value = tag_value }
+      end
+    end
+  end,
+  -- Constants for backward compatibility
+  TYPE_RELATIVE = "relative",
+  TYPE_ABSOLUTE = "absolute",
+  TYPE_NAMED = "named",
+}
 
 return dsl

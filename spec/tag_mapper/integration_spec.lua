@@ -143,21 +143,126 @@ describe("tag_mapper.integration", function()
     end)
 
     it("should validate plan parameter", function()
-      local success, result = pcall(function()
-        return integration.execute_tag_plan(nil, dry_run_interface)
-      end)
+      local result, error_obj =
+        integration.execute_tag_plan(nil, dry_run_interface)
 
-      assert.is_false(success)
-      assert.matches("plan is required", result)
+      assert.is_nil(result)
+      assert.is_table(error_obj)
+      assert.matches("plan is required", error_obj.message)
     end)
 
     it("should validate interface parameter", function()
-      local success, result = pcall(function()
-        return integration.execute_tag_plan(mock_plan, nil)
+      local result, error_obj = integration.execute_tag_plan(mock_plan, nil)
+
+      assert.is_nil(result)
+      assert.is_table(error_obj)
+      assert.matches("interface is required", error_obj.message)
+    end)
+
+    -- New TDD Cycle 3 tests for structured error handling
+    describe("structured error handling", function()
+      it("should aggregate tag creation failures from interface", function()
+        -- Mock interface that fails some tag creations
+        local failing_interface = {
+          create_named_tag = function(name, screen)
+            if name == "editor" then
+              return nil -- First creation fails
+            else
+              return { name = name } -- Others succeed
+            end
+          end,
+          get_screen_context = function()
+            return {
+              screen = { name = "test" },
+              current_tag_index = 3,
+              available_tags = {},
+              tag_count = 0,
+            }
+          end,
+        }
+
+        -- Plan with multiple creations
+        local multi_plan = {
+          assignments = {},
+          creations = {
+            { name = "editor", screen = { name = "test" } },
+            { name = "browser", screen = { name = "test" } },
+          },
+          warnings = {},
+          metadata = {},
+        }
+
+        local results =
+          integration.execute_tag_plan(multi_plan, failing_interface)
+
+        -- Should return results with failures collected, not throw error
+        assert.is_table(results)
+        assert.are.equal(1, #results.failures)
+        assert.are.equal(1, #results.created_tags)
+        assert.are.equal("partial_failure", results.metadata.overall_status)
+
+        -- Failure should be structured
+        local failure = results.failures[1]
+        assert.are.equal("create_tag", failure.operation)
+        assert.are.equal("editor", failure.tag_name)
+        assert.matches("failed to create tag", failure.error)
       end)
 
-      assert.is_false(success)
-      assert.matches("interface is required", result)
+      it(
+        "should handle interface errors that return structured objects",
+        function()
+          -- Mock interface that returns structured error objects
+          local structured_failing_interface = {
+            create_named_tag = function(name, screen)
+              return nil,
+                {
+                  category = "TAG_CREATION_ERROR",
+                  type = "TAG_NAME_INVALID",
+                  message = "Invalid tag name: " .. name,
+                  resource_id = name,
+                  suggestions = { "Use valid tag name format" },
+                  context = { tag_name = name },
+                }
+            end,
+            get_screen_context = function()
+              return {
+                screen = { name = "test" },
+                current_tag_index = 3,
+                available_tags = {},
+                tag_count = 0,
+              }
+            end,
+          }
+
+          local single_creation_plan = {
+            assignments = {},
+            creations = {
+              { name = "invalid-name!", screen = { name = "test" } },
+            },
+            warnings = {},
+            metadata = {},
+          }
+
+          local results = integration.execute_tag_plan(
+            single_creation_plan,
+            structured_failing_interface
+          )
+
+          assert.is_table(results)
+          assert.are.equal(1, #results.failures)
+          assert.are.equal("partial_failure", results.metadata.overall_status)
+
+          -- Failure should preserve structured error information
+          local failure = results.failures[1]
+          assert.are.equal("create_tag", failure.operation)
+          assert.are.equal("invalid-name!", failure.tag_name)
+          assert.is_table(failure.structured_error)
+          assert.are.equal(
+            "TAG_CREATION_ERROR",
+            failure.structured_error.category
+          )
+        end
+      )
     end)
   end)
 
@@ -167,16 +272,16 @@ describe("tag_mapper.integration", function()
     before_each(function()
       mock_resources = {
         {
-          id = "editor_app",
-          tag = "editor",
+          name = "editor_app",
+          tag_spec = "editor",
         },
         {
-          id = "terminal",
-          tag = 1,
+          name = "terminal",
+          tag_spec = 1,
         },
         {
-          id = "browser",
-          tag = "5",
+          name = "browser",
+          tag_spec = "5",
         },
       }
     end)
@@ -230,8 +335,8 @@ describe("tag_mapper.integration", function()
     it("should return comprehensive results with warnings", function()
       -- Add a resource that will cause overflow
       table.insert(mock_resources, {
-        id = "overflow_app",
-        tag = 15, -- will overflow to tag 9
+        name = "overflow_app",
+        tag_spec = 15, -- will overflow to tag 9
       })
 
       local results = integration.resolve_tags_for_project(
@@ -251,34 +356,111 @@ describe("tag_mapper.integration", function()
     end)
 
     it("should validate resources parameter", function()
-      local success, result = pcall(function()
-        return integration.resolve_tags_for_project(nil, 3, dry_run_interface)
-      end)
+      local result, error_obj =
+        integration.resolve_tags_for_project(nil, 3, dry_run_interface)
 
-      assert.is_false(success)
-      assert.matches("resources list is required", result)
+      assert.is_nil(result)
+      assert.is_table(error_obj)
+      assert.matches("resources list is required", error_obj.message)
     end)
 
     it("should validate base_tag parameter", function()
-      local success, result = pcall(function()
-        return integration.resolve_tags_for_project(
-          mock_resources,
-          nil,
-          dry_run_interface
-        )
-      end)
+      local result, error_obj = integration.resolve_tags_for_project(
+        mock_resources,
+        nil,
+        dry_run_interface
+      )
 
-      assert.is_false(success)
-      assert.matches("base tag is required", result)
+      assert.is_nil(result)
+      assert.is_table(error_obj)
+      assert.matches("base tag is required", error_obj.message)
     end)
 
     it("should validate interface parameter", function()
-      local success, result = pcall(function()
-        return integration.resolve_tags_for_project(mock_resources, 3, nil)
-      end)
+      local result, error_obj =
+        integration.resolve_tags_for_project(mock_resources, 3, nil)
 
-      assert.is_false(success)
-      assert.matches("interface is required", result)
+      assert.is_nil(result)
+      assert.is_table(error_obj)
+      assert.matches("interface is required", error_obj.message)
+    end)
+
+    -- New TDD Cycle 3 tests for structured error handling
+    describe("structured error handling", function()
+      it(
+        "should handle core planning errors and return structured errors",
+        function()
+          -- Mock resources that will cause core planning to fail
+          local problem_resources = {
+            {
+              name = "invalid_resource",
+              tag_spec = function() end, -- Invalid tag type that should cause core to return error
+            },
+          }
+
+          local result, error_obj = integration.resolve_tags_for_project(
+            problem_resources,
+            3,
+            dry_run_interface
+          )
+
+          -- With fallback strategy, should succeed with fallbacks and errors in metadata
+          assert.is_table(result, "Should succeed with fallback strategy")
+          assert.is_nil(error_obj, "Should not have critical error")
+          assert.is_table(result.plan, "Should have plan")
+          assert.is_table(result.plan.errors, "Should have errors in metadata")
+          assert.is_true(
+            #result.plan.errors > 0,
+            "Should have collected errors"
+          )
+        end
+      )
+
+      it(
+        "should aggregate errors from both planning and execution phases",
+        function()
+          -- Mock interface that fails during execution
+          local execution_failing_interface = {
+            get_screen_context = function()
+              return {
+                screen = { name = "test" },
+                current_tag_index = 3,
+                available_tags = {},
+                tag_count = 0,
+              }
+            end,
+            create_named_tag = function(name, screen)
+              return nil -- All tag creations fail
+            end,
+          }
+
+          -- Resources that require tag creation (will fail in execution)
+          local creation_resources = {
+            { name = "editor", tag_spec = "editor_workspace" },
+            { name = "browser", tag_spec = "browser_workspace" },
+          }
+
+          local result, error_obj = integration.resolve_tags_for_project(
+            creation_resources,
+            3,
+            execution_failing_interface
+          )
+
+          -- Should handle execution failures gracefully
+          if result then
+            -- Partial success case - execution has failures
+            assert.is_table(result.execution.failures)
+            assert.are.equal(
+              "partial_failure",
+              result.execution.metadata.overall_status
+            )
+          else
+            -- Complete failure case - structured error returned
+            assert.is_table(error_obj)
+            assert.is_string(error_obj.message)
+          end
+        end
+      )
     end)
   end)
 
@@ -287,7 +469,7 @@ describe("tag_mapper.integration", function()
       "should work with both awesome_interface and dry_run_interface",
       function()
         local mock_resources = {
-          { id = "test_app", tag = "test_tag" },
+          { name = "test_app", tag_spec = "test_tag" },
         }
 
         -- Test with dry-run interface

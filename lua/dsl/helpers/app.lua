@@ -5,7 +5,7 @@ Implements the app{} DSL helper function for spawning generic X11 applications.
 Supports all fields defined in the DSL specification and provides validation.
 --]]
 
-local tag_spec = require("dsl.tag_spec")
+local tag_mapper = require("tag_mapper")
 
 local app_helper = {}
 
@@ -94,7 +94,7 @@ function app_helper.validate(spec)
 
   -- Validate tag specification if present
   if spec.tag then
-    local tag_valid, tag_error = tag_spec.validate(spec.tag)
+    local tag_valid, tag_error = tag_mapper.validate_tag_spec(spec.tag)
     if not tag_valid then
       return false, "invalid tag specification: " .. tag_error
     end
@@ -135,12 +135,7 @@ function app_helper.describe(spec)
   end
 
   if spec.tag then
-    local tag_success, tag_info = tag_spec.parse(spec.tag)
-    if tag_success then
-      table.insert(parts, "tag: " .. tag_spec.describe(tag_info))
-    else
-      table.insert(parts, "tag: invalid")
-    end
+    table.insert(parts, "tag: " .. tag_mapper.describe_tag_spec(spec.tag))
   end
 
   if spec.reuse then

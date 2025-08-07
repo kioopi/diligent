@@ -30,6 +30,7 @@ local initial_mock_data = {
     end,
   },
   last_spawn_call = nil,
+  spawn_calls = {},
   screen_context = {
     screen = { index = 1, name = "mock_screen" },
     current_tag_index = 1,
@@ -94,6 +95,11 @@ function mock_interface.create_named_tag(name, screen)
     return nil
   end
 
+  -- magic name for failing tag creation
+  if name == "fail_tag_creation" then
+    return nil
+  end
+
   -- Return mock tag object
   return { name = name, index = 2 }
 end
@@ -137,10 +143,21 @@ end
 ---@return string|nil snid Spawn notification ID
 function mock_interface.spawn(command, properties)
   -- Capture the spawn call for testing inspection
-  mock_data.last_spawn_call = {
+
+  local spawn_call = {
     command = command,
-    properties = properties,
+    properties = properties or {},
   }
+
+  -- last spawn call for easy inspection
+  mock_data.last_spawn_call = spawn_call
+
+  -- Store the spawn call in history
+  table.insert(mock_data.spawn_calls, spawn_call)
+
+  if command == "fail_spawn" then
+    return "Error: Command not found"
+  end
 
   if mock_data.spawn_config.success then
     return mock_data.spawn_config.pid, mock_data.spawn_config.snid
@@ -158,6 +175,7 @@ end
 
 ---Set spawn configuration for testing
 ---@param config table Spawn configuration {success=bool, pid=number, snid=string, error=string}
+---@example mock.interface.set_spawn_config({ success = false, error = "Error: Command not found" })
 function mock_interface.set_spawn_config(config)
   mock_data.spawn_config = config
     or {
@@ -180,6 +198,12 @@ function mock_interface.get_last_spawn_call()
   return mock_data.last_spawn_call
 end
 
+---Get all spawn calls made during testing
+---@return table spawn_calls List of all spawn calls made
+function mock_interface.get_spawn_calls()
+  return mock_data.spawn_calls
+end
+
 --- Set the current tag index in the mock screen context
 --- @param index number Index to set as current tag index
 function mock_interface.set_current_tag_index(index)
@@ -190,7 +214,7 @@ function mock_interface.set_current_tag_index(index)
 end
 
 --Set the screen context for testing
----@return table|nil spawn_call Table, or nil to set up a failing screen context
+--@return table|nil spawn_call Table, or nil to set up a failing screen context
 function mock_interface.set_screen_context(screen_context)
   mock_data.screen_context = screen_context or "mock-failing-screen"
 end

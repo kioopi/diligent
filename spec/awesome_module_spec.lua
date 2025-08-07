@@ -5,6 +5,13 @@ describe("Diligent AwesomeWM Module", function()
   local mock_awesome
   local captured_signals
 
+  setup(function()
+    _G._TEST = true
+  end)
+  teardown(function()
+    _G._TEST = nil
+  end)
+
   before_each(function()
     -- Reset captured signals
     captured_signals = {}

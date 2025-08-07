@@ -3,9 +3,35 @@ Tag Mapper Core Module
 
 Pure functions for tag resolution logic with no external dependencies.
 Separates tag resolution logic from AwesomeWM interaction for better testability.
+Enhanced with structured error handling instead of throwing exceptions.
 --]]
 
 local tag_mapper_core = {}
+
+-- Import error framework for structured error objects
+local error_reporter = require("diligent.error.reporter").create()
+
+-- Helper function to create validation error object
+local function create_validation_error(message, context)
+  return error_reporter.create_tag_resolution_error(
+    nil, -- no resource_id for validation errors
+    nil, -- no tag_spec for validation errors
+    "TAG_SPEC_INVALID",
+    message,
+    context or {}
+  )
+end
+
+-- Helper function to create tag spec error object
+local function create_tag_spec_error(tag_spec, message, error_type, context)
+  return error_reporter.create_tag_resolution_error(
+    nil, -- no resource_id at this level
+    tag_spec,
+    error_type or "TAG_SPEC_INVALID",
+    message,
+    context or {}
+  )
+end
 
 ---Check if a string contains only digits
 ---@param str string String to check
@@ -38,27 +64,39 @@ end
 ---@param tag_spec number|string Tag specification (relative offset, absolute string, or name)
 ---@param base_tag number Current base tag index for relative calculations
 ---@param screen_context table Screen context with available tags and metadata
----@return table result Structured tag resolution result
+---@return boolean success True if resolution succeeded
+---@return table result Structured tag resolution result on success, error object on failure
+---@return table metadata Additional context (timing, warnings, etc.)
 function tag_mapper_core.resolve_tag_specification(
   tag_spec,
   base_tag,
   screen_context
 )
-  -- Input validation
+  local start_time = os.clock()
+
+  -- Input validation - return error objects with new pattern
   if tag_spec == nil then
-    error("tag spec is required")
+    return false,
+      create_validation_error("tag spec is required"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   if base_tag == nil then
-    error("base tag is required")
+    return false,
+      create_validation_error("base tag is required"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   if type(base_tag) ~= "number" then
-    error("base tag must be a number")
+    return false,
+      create_validation_error("base tag must be a number"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   if screen_context == nil then
-    error("screen context is required")
+    return false,
+      create_validation_error("screen context is required"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   -- Handle relative numeric offset
@@ -79,12 +117,22 @@ function tag_mapper_core.resolve_tag_specification(
       overflow = true
     end
 
-    return {
-      type = "relative",
-      resolved_index = resolved_index,
-      overflow = overflow,
-      original_index = original_index,
+    local metadata = {
+      timing = os.clock() - start_time,
+      tag_type = "relative",
+      overflow_detected = overflow,
+      base_tag = base_tag,
+      offset = tag_spec,
     }
+
+    return true,
+      {
+        type = "relative",
+        resolved_index = resolved_index,
+        overflow = overflow,
+        original_index = original_index,
+      },
+      metadata
   end
 
   -- Handle absolute digit string
@@ -100,59 +148,141 @@ function tag_mapper_core.resolve_tag_specification(
       overflow = true
     end
 
-    return {
-      type = "absolute",
-      resolved_index = resolved_index,
-      overflow = overflow,
-      original_index = original_index,
+    local metadata = {
+      timing = os.clock() - start_time,
+      tag_type = "absolute",
+      overflow_detected = overflow,
+      original_spec = tag_spec,
     }
+
+    return true,
+      {
+        type = "absolute",
+        resolved_index = resolved_index,
+        overflow = overflow,
+        original_index = original_index,
+      },
+      metadata
   end
 
   -- Handle named tag
   if type(tag_spec) == "string" then
     local existing_tag = find_existing_tag_by_name(tag_spec, screen_context)
 
-    return {
-      type = "named",
-      name = tag_spec,
-      overflow = false,
-      needs_creation = existing_tag == nil,
+    local metadata = {
+      timing = os.clock() - start_time,
+      tag_type = "named",
+      tag_exists = existing_tag ~= nil,
+      tag_name = tag_spec,
     }
+
+    return true,
+      {
+        type = "named",
+        name = tag_spec,
+        overflow = false,
+        needs_creation = existing_tag == nil,
+      },
+      metadata
   end
 
   -- Invalid tag spec type
-  error("invalid tag spec type: " .. type(tag_spec))
+  return false,
+    create_tag_spec_error(
+      tag_spec,
+      "invalid tag spec type: " .. type(tag_spec),
+      "TAG_SPEC_INVALID",
+      { tag_spec_type = type(tag_spec) }
+    ),
+    {
+      validation_error = true,
+      timing = os.clock() - start_time,
+      invalid_type = type(tag_spec),
+    }
+end
+
+---Resolve tag specification with fallback strategy
+---Attempts normal resolution first, then applies fallback on failure
+---@param tag_spec number|string Tag specification to resolve
+---@param base_tag number Current base tag index for fallbacks
+---@param screen_context table Screen context with available tags
+---@return table resolved_tag Always returns a resolved tag object (with fallbacks)
+---@return table|nil error_obj Original error object if fallback was used, nil if normal resolution succeeded
+local function resolve_with_fallback(tag_spec, base_tag, screen_context)
+  -- Try normal resolution first
+  local success, result, _metadata = tag_mapper_core.resolve_tag_specification(
+    tag_spec,
+    base_tag,
+    screen_context
+  )
+
+  if success then
+    result.fallback_used = false
+    return result, nil -- no error - normal resolution succeeded
+  end
+
+  -- Normal resolution failed - apply fallback strategy
+  local current_tag = screen_context.current_tag_index or base_tag or 1
+
+  -- Ensure current_tag is in valid range (1-9)
+  if current_tag < 1 or current_tag > 9 then
+    current_tag = 1
+  end
+
+  -- Create fallback tag object
+  local fallback_tag = {
+    type = "absolute",
+    resolved_index = current_tag,
+    overflow = false,
+    name = tostring(current_tag),
+    needs_creation = false,
+    fallback_used = true,
+    original_error = result, -- preserve original error
+  }
+
+  return fallback_tag, result -- return fallback + original error for metadata
 end
 
 ---Plan tag operations for a list of resources
 ---Takes resources and screen context, returns structured operation plan
----@param resources table List of resource objects with id and tag fields
+---@param resources table List of resource objects with name and tag_spec fields
 ---@param screen_context table Screen context with available tags and metadata
 ---@param base_tag number Current base tag index for relative calculations
----@return table plan Structured operation plan with assignments, creations, warnings
+---@return boolean success True if planning succeeded
+---@return table result Structured operation plan on success, error object on failure
+---@return table metadata Additional context (timing, statistics, etc.)
 function tag_mapper_core.plan_tag_operations(
   resources,
   screen_context,
   base_tag
 )
-  -- Input validation
+  local start_time = os.clock()
+
+  -- Input validation - return error objects with new pattern
   if resources == nil then
-    error("resources list is required")
+    return false,
+      create_validation_error("resources list is required"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   if screen_context == nil then
-    error("screen context is required")
+    return false,
+      create_validation_error("screen context is required"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
   if base_tag == nil then
-    error("base tag is required")
+    return false,
+      create_validation_error("base tag is required"),
+      { validation_error = true, timing = os.clock() - start_time }
   end
 
-  -- Initialize plan structure
+  -- Initialize plan structure with errors array for fallback strategy
   local plan = {
     assignments = {},
     creations = {},
     warnings = {},
+    errors = {}, -- Always include errors array for fallback strategy
     metadata = {
       base_tag = base_tag,
       total_operations = #resources,
@@ -162,41 +292,51 @@ function tag_mapper_core.plan_tag_operations(
   -- Track which named tags need creation to avoid duplicates
   local tags_to_create = {}
 
-  -- Process each resource
+  -- Process each resource with fallback strategy
   for _, resource in ipairs(resources) do
-    if resource.id and resource.tag ~= nil then
-      -- Resolve tag specification for this resource
-      local resolution = tag_mapper_core.resolve_tag_specification(
-        resource.tag,
-        base_tag,
-        screen_context
-      )
+    if resource.name and resource.tag_spec ~= nil then
+      -- Use fallback strategy - always get a resolved tag
+      local resolution, error_obj =
+        resolve_with_fallback(resource.tag_spec, base_tag, screen_context)
 
-      -- Create assignment entry
+      -- Always create assignment (with fallback if needed)
       local assignment = {
-        resource_id = resource.id,
+        resource_id = resource.name,
         type = resolution.type,
         resolved_index = resolution.resolved_index,
         name = resolution.name,
-        overflow = resolution.overflow,
+        overflow = resolution.overflow or false,
         original_index = resolution.original_index,
-        needs_creation = resolution.needs_creation,
+        needs_creation = resolution.needs_creation or false,
+        fallback_used = resolution.fallback_used or false,
+        original_error = resolution.original_error,
       }
 
       table.insert(plan.assignments, assignment)
+
+      -- Collect error for metadata if fallback was used
+      if error_obj then
+        error_obj.resource_id = resource.name
+        error_obj.fallback_used = assignment.fallback_used
+        table.insert(plan.errors, error_obj)
+      end
 
       -- Handle overflow warnings
       if resolution.overflow then
         table.insert(plan.warnings, {
           type = "overflow",
-          resource_id = resource.id,
+          resource_id = resource.name,
           original_index = resolution.original_index,
           final_index = resolution.resolved_index,
         })
       end
 
-      -- Track named tags that need creation
-      if resolution.type == "named" and resolution.needs_creation then
+      -- Track named tags that need creation (only for successful non-fallback resolutions)
+      if
+        resolution.type == "named"
+        and resolution.needs_creation
+        and not resolution.fallback_used
+      then
         tags_to_create[resolution.name] = true
       end
     end
@@ -211,7 +351,27 @@ function tag_mapper_core.plan_tag_operations(
     })
   end
 
-  return plan
+  -- Always return success unless critical system error
+  plan.has_errors = #plan.errors > 0
+
+  local metadata = {
+    timing = os.clock() - start_time,
+    total_resources = #resources,
+    successful_resolutions = #plan.assignments,
+    fallback_count = 0, -- will calculate below
+    errors_count = #plan.errors,
+    tags_to_create = #plan.creations,
+    warnings_count = #plan.warnings,
+  }
+
+  -- Calculate fallback usage statistics
+  for _, assignment in ipairs(plan.assignments) do
+    if assignment.fallback_used then
+      metadata.fallback_count = metadata.fallback_count + 1
+    end
+  end
+
+  return true, plan, metadata
 end
 
 return tag_mapper_core

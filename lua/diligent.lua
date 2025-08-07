@@ -5,6 +5,7 @@ local utils = require("diligent.utils")
 local ping_handler = require("diligent.handlers.ping")
 local spawn_test_handler = require("diligent.handlers.spawn_test")
 local kill_test_handler = require("diligent.handlers.kill_test")
+local start_handler = require("diligent.handlers.start")
 
 diligent.handlers = {}
 
@@ -112,6 +113,10 @@ function diligent.setup()
   diligent.register_handler("diligent::ping", ping_handler)
   diligent.register_handler("diligent::spawn_test", spawn_test_handler)
   diligent.register_handler("diligent::kill_test", kill_test_handler)
+
+  -- Register start handler with awe module
+  local awe = require("awe")
+  diligent.register_handler("diligent::start", start_handler.create(awe))
 
   return true
 end

@@ -56,18 +56,20 @@ describe("awe.spawn.spawner", function()
   end)
 
   describe("spawn_with_properties", function()
-    it("should handle tag resolution failure", function()
-      -- Use nil tag_spec to trigger validation error in tag_mapper.resolve_tag
+    it("should handle invalid tag object", function()
+      -- Pass invalid tag object (nil) to trigger validation error
       local pid, snid, msg = spawner.spawn_with_properties("firefox", nil, {})
 
       assert.is_nil(pid)
       assert.is_nil(snid)
-      assert.is_truthy(msg:match("Tag resolution failed"))
+      assert.is_truthy(msg:match("Invalid tag object"))
     end)
 
     it("should handle config being false (JSON quirk)", function()
+      -- Create a valid resolved tag object
+      local resolved_tag = { index = 2, name = "2" }
       local pid, snid, msg =
-        spawner.spawn_with_properties("firefox", "+1", false)
+        spawner.spawn_with_properties("firefox", resolved_tag, false)
 
       -- Should not crash and should treat as empty config
       assert.is_not_nil(msg)
@@ -81,7 +83,10 @@ describe("awe.spawn.spawner", function()
         snid = "snid-123",
       })
 
-      local pid, snid, msg = spawner.spawn_with_properties("firefox", "+1", {})
+      -- Create a valid resolved tag object
+      local resolved_tag = { index = 3, name = "3" }
+      local pid, snid, msg =
+        spawner.spawn_with_properties("firefox", resolved_tag, {})
 
       assert.are.equal(1234, pid)
       assert.are.equal("snid-123", snid)
@@ -97,7 +102,10 @@ describe("awe.spawn.spawner", function()
         error = "Command not found: firefox",
       })
 
-      local pid, snid, msg = spawner.spawn_with_properties("firefox", "+1", {})
+      -- Create a valid resolved tag object
+      local resolved_tag = { index = 1, name = "1" }
+      local pid, snid, msg =
+        spawner.spawn_with_properties("firefox", resolved_tag, {})
 
       assert.is_nil(pid)
       assert.is_nil(snid)
@@ -118,7 +126,9 @@ describe("awe.spawn.spawner", function()
         env_vars = { DISPLAY = ":1" },
       }
 
-      spawner.spawn_with_properties("firefox", "+1", config)
+      -- Create a valid resolved tag object
+      local resolved_tag = { index = 2, name = "2" }
+      spawner.spawn_with_properties("firefox", resolved_tag, config)
 
       -- Get the captured spawn call
       local spawn_call = mock_interface.get_last_spawn_call()
@@ -141,7 +151,10 @@ describe("awe.spawn.spawner", function()
         snid = "snid-456",
       })
 
-      local pid, snid, msg = spawner.spawn_with_properties("gedit", "work", {})
+      -- Create a valid resolved tag object (named tag)
+      local resolved_tag = { index = 2, name = "work" }
+      local pid, snid, msg =
+        spawner.spawn_with_properties("gedit", resolved_tag, {})
 
       assert.is_truthy(msg:match("SUCCESS"))
       assert.is_truthy(msg:match("gedit"))
@@ -169,8 +182,10 @@ describe("awe.spawn.spawner", function()
         },
       }
 
+      -- Create a valid resolved tag object
+      local resolved_tag = { index = 3, name = "3" }
       local pid, snid, msg =
-        spawner.spawn_with_properties("myapp", "+2", config)
+        spawner.spawn_with_properties("myapp", resolved_tag, config)
 
       assert.are.equal(9999, pid)
 

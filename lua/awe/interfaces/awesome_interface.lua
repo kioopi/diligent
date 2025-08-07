@@ -64,7 +64,8 @@ function awesome_interface._get_current_tag_index(screen)
   if screen and screen.selected_tag and screen.selected_tag.index then
     return screen.selected_tag.index
   end
-  return 1 -- safe fallback
+  error("no current tag available - screen.selected_tag is nil")
+  --return 1 -- safe fallback
 end
 
 ---Find tag by name on a specific screen

@@ -12,12 +12,12 @@ local function create_spawner(interface)
 
   ---Spawn application with properties
   ---@param app string Application command
-  ---@param tag_spec string Tag specification
+  ---@param target_tag table Resolved tag object with index and name properties
   ---@param config table Configuration options
   ---@return number|nil pid Process ID
   ---@return string|nil snid Spawn notification ID
   ---@return string message Result message
-  function spawner.spawn_with_properties(app, tag_spec, config)
+  function spawner.spawn_with_properties(app, target_tag, config)
     config = config or {}
 
     -- Handle JSON decoding quirk where {} becomes false
@@ -25,26 +25,24 @@ local function create_spawner(interface)
       config = {}
     end
 
-    -- Step 1: Resolve tag using new awe.tag.resolver
-    local create_tag_modules = require("awe.tag")
-    local tag_modules = create_tag_modules(interface)
-    local success, target_tag = tag_modules.resolver.resolve_tag_spec(tag_spec)
-
-    if not success then
-      return nil, nil, "Tag resolution failed: " .. target_tag
+    -- Validate that we received a resolved tag object
+    if type(target_tag) ~= "table" or not target_tag.index then
+      return nil,
+        nil,
+        "Invalid tag object: expected resolved tag with index property"
     end
 
-    -- Step 2: Build properties using configuration module
+    -- Step 1: Build properties using configuration module
     local create_configuration = require("awe.spawn.configuration")
     local configuration = create_configuration(interface)
     local properties = configuration.build_spawn_properties(target_tag, config)
 
-    -- Step 3: Build command with environment variables using environment module
+    -- Step 2: Build command with environment variables using environment module
     local create_environment = require("awe.spawn.environment")
     local environment = create_environment(interface)
     local command = environment.build_command_with_env(app, config.env_vars)
 
-    -- Step 4: Spawn application using interface
+    -- Step 3: Spawn application using interface
     local pid, snid
     if interface.spawn then
       pid, snid = interface.spawn(command, properties)
@@ -71,14 +69,25 @@ local function create_spawner(interface)
     end
   end
 
-  ---Simplified spawn interface
+  ---Simplified spawn interface (convenience function with tag resolution)
   ---@param app string Application command
   ---@param tag_spec string Tag specification
   ---@return number|nil pid Process ID
   ---@return string|nil snid Spawn notification ID
   ---@return string message Result message
   function spawner.spawn_simple(app, tag_spec)
-    return spawner.spawn_with_properties(app, tag_spec, {})
+    -- Resolve tag specification using tag_mapper for convenience function
+    local tag_mapper = require("tag_mapper")
+    local current_tag_index = tag_mapper.get_current_tag(interface)
+    local success, target_tag =
+      tag_mapper.resolve_tag(tag_spec, current_tag_index, interface)
+
+    if not success then
+      return nil, nil, "Tag resolution failed: " .. target_tag
+    end
+
+    -- Call main function with resolved tag
+    return spawner.spawn_with_properties(app, target_tag, {})
   end
 
   return spawner
