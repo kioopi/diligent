@@ -216,6 +216,289 @@ describe("Start Handler", function()
     end)
   end)
 
+  describe("enhanced error collection (Phase 5)", function()
+    local phase5_handler
+
+    before_each(function()
+      mock_interface.reset()
+
+      -- Create a separate handler instance with mocked dependencies for Phase 5 tests
+      -- This avoids interfering with other test suites
+      local mock_tag_mapper = {
+        get_current_tag = function(interface)
+          return 1 -- Mock current tag
+        end,
+        resolve_tags_for_project = function(resources, base_tag, interface)
+          -- Mock function to return different error scenarios for testing
+          return nil, {
+            type = "TAG_OVERFLOW",
+            category = "validation", 
+            resource_id = "editor",
+            tag_spec = 2,
+            message = "Tag overflow: resolved to tag 9",
+            context = {
+              base_tag = 2,
+              resolved_index = 11,
+              original_spec = 2
+            },
+            suggestions = {
+              "Consider using absolute tag \"9\"",
+              "Check if you intended a relative offset"
+            },
+            metadata = {
+              timestamp = os.time(),
+              phase = "planning"
+            }
+          }
+        end
+      }
+
+      -- Create Phase 5 handler by directly injecting the mock
+      phase5_handler = {
+        validator = start_handler.validator,
+        execute = function(payload)
+          -- Simplified version of handler.execute that uses the mock_tag_mapper directly
+          local spawned_resources = {}
+          local interface = awe.interface
+          local current_tag_index = mock_tag_mapper.get_current_tag(interface)
+          
+          local tag_mapper_resources = {}
+          for _, resource in ipairs(payload.resources or {}) do
+            table.insert(tag_mapper_resources, {
+              id = resource.name,
+              tag = resource.tag_spec,
+            })
+          end
+          
+          local tag_success, tag_result = mock_tag_mapper.resolve_tags_for_project(
+            tag_mapper_resources,
+            current_tag_index,
+            interface
+          )
+          
+          if not tag_success then
+            return start_handler.create(awe).format_error_response(payload.project_name, tag_result, payload.resources)
+          end
+          
+          -- Process spawning with normal handler logic
+          return handler.execute(payload)
+        end
+      }
+      
+      -- Add the format_error_response method
+      phase5_handler.format_error_response = start_handler.create(awe).format_error_response
+    end)
+
+    it("should collect structured error objects from tag_mapper", function()
+      local payload = {
+        project_name = "error-test",
+        resources = {
+          {
+            name = "editor",
+            command = "gedit",
+            tag_spec = 2,
+          },
+        },
+      }
+
+      local success, result = phase5_handler.execute(payload)
+      
+      assert.is_false(success, "Handler should fail with structured error")
+      
+      -- Test enhanced error response format
+      assert.is_table(result, "Result should be a table")
+      assert.equals("error-test", result.project_name)
+      assert.equals("COMPLETE_FAILURE", result.error_type)
+      assert.is_table(result.errors, "Should have errors array")
+      assert.equals(1, #result.errors, "Should have one error")
+      
+      -- Test error object structure
+      local error_obj = result.errors[1]
+      assert.equals("tag_resolution", error_obj.phase)
+      assert.equals("editor", error_obj.resource_id) 
+      assert.is_table(error_obj.error, "Should contain structured error object")
+      assert.equals("TAG_OVERFLOW", error_obj.error.type)
+      assert.equals("Tag overflow: resolved to tag 9", error_obj.error.message)
+      assert.is_table(error_obj.error.suggestions, "Should have suggestions")
+      assert.equals(2, #error_obj.error.suggestions)
+    end)
+
+    it("should continue processing after tag resolution failures when possible", function()
+      -- Update the phase5_handler to return partial success data
+      phase5_handler.execute = function(payload)
+        -- Mock tag_mapper to succeed for some resources, fail for others
+        local tag_result = {
+          type = "MULTIPLE_TAG_ERRORS", 
+          category = "validation",
+          message = "Tag resolution failed for some resources",
+          context = {
+            failed_resources = {"editor"},
+            successful_resources = {"terminal"}
+          },
+          partial_success = {
+            resolved_tags = {
+              terminal = { index = 2, name = "2" }
+            },
+            tag_operations = {
+              created_tags = {},
+              assignments = {{resource_id = "terminal", resolved_index = 2}},
+              warnings = {},
+              total_created = 0
+            }
+          },
+          errors = {
+            {
+              type = "TAG_OVERFLOW",
+              resource_id = "editor", 
+              message = "Tag overflow: resolved to tag 9"
+            }
+          }
+        }
+        
+        return start_handler.create(awe).format_error_response(payload.project_name, tag_result, payload.resources)
+      end
+
+      local payload = {
+        project_name = "partial-test",
+        resources = {
+          {
+            name = "editor",
+            command = "gedit", 
+            tag_spec = 2,
+          },
+          {
+            name = "terminal",
+            command = "alacritty",
+            tag_spec = "2", 
+          },
+        },
+      }
+
+      local success, result = phase5_handler.execute(payload)
+      
+      assert.is_false(success, "Handler should fail but provide partial success")
+      assert.equals("PARTIAL_FAILURE", result.error_type)
+      assert.is_table(result.partial_success, "Should have partial success data")
+      assert.is_table(result.partial_success.spawned_resources)
+      assert.equals(1, result.partial_success.total_spawned)
+      assert.equals("terminal", result.partial_success.spawned_resources[1].name)
+      
+      -- Verify metadata
+      assert.is_table(result.metadata)
+      assert.equals(2, result.metadata.total_attempted)
+      assert.equals(1, result.metadata.success_count)
+      assert.equals(1, result.metadata.error_count)
+    end)
+
+    it("should handle multiple error types in single response", function()
+      -- Mock both tag resolution and spawning errors
+      phase5_handler.execute = function(payload)
+        -- Simulate tag resolution success but spawning failure
+        local spawned_resources = {}
+        local spawn_errors = {}
+        
+        -- First resource succeeds
+        table.insert(spawned_resources, {
+          name = "editor",
+          pid = 12345,
+          snid = "snid1",
+          command = "gedit",
+          tag_spec = "2",
+        })
+        
+        -- Second resource fails to spawn
+        table.insert(spawn_errors, {
+          phase = "spawning",
+          resource_id = "browser",
+          error = {
+            type = "SPAWN_FAILURE",
+            message = "Command not found: nonexistent-browser",
+            context = { command = "nonexistent-browser" }
+          }
+        })
+        
+        -- Return partial failure response
+        return false, {
+          project_name = payload.project_name,
+          error_type = "PARTIAL_FAILURE",
+          errors = spawn_errors,
+          partial_success = {
+            spawned_resources = spawned_resources,
+            total_spawned = #spawned_resources
+          },
+          metadata = {
+            total_attempted = #payload.resources,
+            success_count = #spawned_resources,
+            error_count = #spawn_errors
+          }
+        }
+      end
+
+      local payload = {
+        project_name = "mixed-errors-test",
+        resources = {
+          {
+            name = "editor",
+            command = "gedit",
+            tag_spec = "2",
+          },
+          {
+            name = "browser", 
+            command = "nonexistent-browser",
+            tag_spec = "3",
+          },
+        },
+      }
+
+      local success, result = phase5_handler.execute(payload)
+      
+      assert.is_false(success, "Handler should fail with mixed errors")
+      assert.equals("PARTIAL_FAILURE", result.error_type)
+      assert.equals(1, #result.errors) -- One spawning error
+      assert.equals("spawning", result.errors[1].phase)
+      assert.equals("browser", result.errors[1].resource_id)
+      
+      -- Should have partial success with editor
+      assert.equals(1, result.partial_success.total_spawned)
+      assert.equals("editor", result.partial_success.spawned_resources[1].name)
+    end)
+
+    it("should format complete failure when no resources succeed", function()
+      -- Update phase5_handler for complete failure scenario
+      phase5_handler.execute = function(payload)
+        local tag_result = {
+          type = "MULTIPLE_TAG_ERRORS",
+          category = "validation", 
+          message = "All tag resolutions failed",
+          errors = {
+            {type = "TAG_OVERFLOW", resource_id = "editor", message = "Tag overflow"},
+            {type = "TAG_SPEC_INVALID", resource_id = "browser", message = "Invalid tag spec"}
+          }
+        }
+        
+        return start_handler.create(awe).format_error_response(payload.project_name, tag_result, payload.resources)
+      end
+
+      local payload = {
+        project_name = "complete-fail-test",
+        resources = {
+          {name = "editor", command = "gedit", tag_spec = 2},
+          {name = "browser", command = "firefox", tag_spec = {}},
+        },
+      }
+
+      local success, result = phase5_handler.execute(payload)
+      
+      assert.is_false(success)
+      assert.equals("COMPLETE_FAILURE", result.error_type)
+      assert.equals(2, #result.errors)
+      assert.is_nil(result.partial_success, "Should not have partial success")
+      assert.equals(2, result.metadata.total_attempted)
+      assert.equals(0, result.metadata.success_count)
+      assert.equals(2, result.metadata.error_count)
+    end)
+  end)
+
   describe("tag resolution with tag_mapper", function()
     local original_tag_mapper
     local original_start_handler

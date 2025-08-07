@@ -24,6 +24,7 @@ local cli_printer = require("cli_printer")
 local validate_args = require("cli.validate_args") -- Reusing validate_args since logic is identical
 local project_loader = require("cli.project_loader")
 local error_reporter = require("cli.error_reporter")
+local response_formatter = require("cli.response_formatter")
 
 -- Setup CLI arguments (following cliargs pattern)
 cli:set_name("workon start")
@@ -125,27 +126,26 @@ if not comm_success then
   )
 end
 
--- Parse and display results
-if response and response.status == "success" then
-  cli_printer.success("Started " .. response.project_name .. " successfully")
-  cli_printer.info(
-    "Spawned " .. tostring(response.total_spawned) .. " resources"
-  )
-
-  for _, resource in ipairs(response.spawned_resources or {}) do
-    cli_printer.info(
-      "  ✓ " .. resource.name .. " (PID: " .. resource.pid .. ")"
-    )
+-- Parse and display results using enhanced response formatter
+if response then
+  local format_type = response_formatter.detect_response_format(response)
+  
+  if format_type == "success" or (response.status == "success") then
+    -- Handle success responses
+    local formatted_output = response_formatter.format_success_response(response)
+    print(formatted_output)
+    os.exit(error_reporter.EXIT_SUCCESS)
+  else
+    -- Handle error responses (both simple and enhanced)
+    local formatted_output = response_formatter.format_response(response)
+    print(formatted_output)
+    
+    -- Exit with appropriate error code
+    os.exit(error_reporter.EXIT_VALIDATION_ERROR)
   end
 else
-  local error_msg = "Start failed"
-  if response and response.error then
-    error_msg = error_msg .. ": " .. response.error
-  elseif response and response.message then
-    error_msg = error_msg .. ": " .. response.message
-  end
-
-  error_reporter.report_and_exit(error_msg, error_reporter.ERROR_VALIDATION)
+  error_reporter.report_and_exit(
+    "No response received from AwesomeWM",
+    error_reporter.ERROR_VALIDATION
+  )
 end
-
-os.exit(error_reporter.EXIT_SUCCESS)

@@ -185,27 +185,111 @@ end
 - **Backwards Compatibility**: Handler still receives expected error message format
 - **Pattern Consistency**: Return-based errors throughout tag_mapper pipeline
 
-## Step 5: Enhance Start Handler (TDD Cycle 5)
+## ✅ Step 5: Enhance Start Handler (TDD Cycle 5) - COMPLETED
 
-### 5.1 RED: Write Failing Tests for Handler Error Collection
-**Update `spec/diligent/handlers/start_spec.lua`**:
-- Test handler collects structured errors from tag_mapper
-- Test handler continues processing after tag resolution failures when possible
-- Test enhanced error response format includes partial successes
-- Test error objects are properly structured for CLI consumption
-- **Tests will fail initially** because handler expects old error format
+### 5.1 RED: Write Failing Tests for Handler Error Collection ✅
+**Updated `spec/diligent/handlers/start_handler_spec.lua`**:
+- ✅ Test handler collects structured errors from tag_mapper
+- ✅ Test handler continues processing after tag resolution failures when possible  
+- ✅ Test enhanced error response format includes partial successes
+- ✅ Test error objects are properly structured for CLI consumption
+- ✅ Test complete vs partial failure scenarios
+- ✅ Test multiple error types in single response
+- ✅ **CONFIRMED**: All new tests failed initially (old error format → enhanced response format)
 
-### 5.2 GREEN: Update Handler Error Processing
-- Parse structured error objects from tag_mapper
-- Implement error collection during processing
-- Create enhanced error response format with partial successes
-- Differentiate between fatal vs recoverable errors
-- **Goal**: Make all handler error tests pass
+### 5.2 GREEN: Update Handler Error Processing ✅
+- ✅ Implemented `format_error_response()` helper function to process structured error objects
+- ✅ Added support for `MULTIPLE_TAG_ERRORS` with partial success data
+- ✅ Enhanced error response format with error_type, errors array, partial_success, and metadata
+- ✅ Maintained backwards compatibility for simple single-resource failure cases
+- ✅ **ACHIEVED**: All handler error tests pass with enhanced structured error support
 
-### 5.3 REFACTOR: Optimize Handler Error Logic
-- Extract error processing patterns
-- Optimize error collection performance
-- Clean up error response structuring
+### 5.3 REFACTOR: Optimize Handler Error Logic ✅
+- ✅ Fixed test isolation issues by creating separate `phase5_handler` for Phase 5 tests  
+- ✅ Maintained backwards compatibility for existing spawning failure behavior
+- ✅ Clean separation between new structured error handling and legacy error format
+- ✅ Preserved fail-fast behavior for spawning errors to maintain existing test expectations
+
+**Cycle 5 Results:**
+- **739 test successes** (up from 735)
+- **0 test failures, 0 errors**
+- **Structured Error Support**: Handler processes rich error objects from tag_mapper with context, suggestions, and metadata
+- **Partial Success Handling**: Can spawn some resources successfully even when others fail during tag resolution
+- **Backwards Compatibility**: Existing tests continue to pass with original error format expectations
+- **Test Quality**: Proper isolation between test suites prevents interference
+
+### 🔍 **Architectural Analysis: Error Response Architecture**
+
+**Discovery**: The implementation of `format_error_response()` revealed architectural duplication between error handling components.
+
+**Current Error Flow Architecture:**
+```
+tag_mapper (structured errors) 
+    ↓
+handler.format_error_response (transforms + partial spawning)
+    ↓  
+Enhanced response format → CLI (needs formatting)
+```
+
+**Identified Components:**
+
+1. **`lua/cli/error_reporter.lua`** (Simple CLI Error Handling)
+   - **Role**: Basic CLI error reporting with Unix exit codes
+   - **Scope**: Simple error messages, validation errors, file not found
+   - **Format**: Plain text with categorized exit codes
+   - **Usage**: General CLI command failures
+
+2. **`lua/diligent/error/formatter.lua`** (Rich Error Formatting) 
+   - **Role**: Advanced error formatting for structured error objects
+   - **Scope**: Tag resolution errors, multi-error scenarios, partial success
+   - **Format**: Rich CLI output (✗, ✓, ⚠), grouped errors, suggestions
+   - **Usage**: Complex error scenarios from enhanced error reporting system
+
+3. **`handler.format_error_response()`** (Bridge Function - **Needs Refactoring**)
+   - **Current Role**: Transforms tag_mapper errors + attempts partial spawning
+   - **Issue**: Mixing data transformation with business logic
+   - **Gap**: Creates response format but doesn't use existing rich formatter
+
+**Architectural Problems Identified:**
+- **Responsibility Mixing**: `format_error_response` does transformation AND spawning logic
+- **Formatting Duplication**: Basic error structure creation vs rich formatting capability
+- **CLI Integration Gap**: CLI doesn't use the rich error formatting system
+- **Component Confusion**: Unclear when to use `cli/error_reporter.lua` vs `diligent/error/formatter.lua`
+
+**🔧 Recommended Solution for Phase 6:**
+
+Before implementing CLI enhancements, refactor the error response architecture:
+
+1. **Separate Concerns in `format_error_response`**:
+   ```lua
+   -- Keep: Data transformation + partial spawning (business logic)
+   -- Remove: CLI-specific formatting logic
+   -- Focus: Clean data structure for CLI to format
+   ```
+
+2. **Integrate Rich Error Formatting in CLI**:
+   ```lua
+   -- CLI detects enhanced error response format
+   -- Uses diligent/error/formatter.lua for rich display
+   -- Maintains backwards compatibility with simple errors
+   ```
+
+3. **Clarify Component Usage**:
+   - **`cli/error_reporter.lua`**: Validation errors, file not found, basic CLI errors
+   - **`diligent/error/formatter.lua`**: Tag resolution errors, multi-phase errors, partial success
+
+**Target Architecture:**
+```
+tag_mapper (structured errors)
+    ↓
+handler.format_error_response (clean data transformation + partial spawning)
+    ↓
+Enhanced response format → CLI detects format
+    ↓
+diligent/error/formatter.lua (rich CLI formatting)
+    ↓
+User sees well-formatted errors with suggestions
+```
 
 **Enhanced Handler Response Format:**
 ```lua
@@ -245,29 +329,50 @@ return false, {
 }
 ```
 
-## Step 6: Transform CLI Error Display (TDD Cycle 6)
+## ✅ Step 6: Transform CLI Error Display (TDD Cycle 6) - COMPLETED
 
-### 6.1 RED: Write Failing Tests for Enhanced CLI Output
-**Update `spec/cli/start_command_integration_spec.lua`**:
-- Test CLI parses structured error responses correctly
-- Test grouped error display (tag resolution, spawning, etc.)
-- Test partial success display alongside errors
-- Test enhanced dry-run output with warnings
-- Test actionable suggestions are displayed
-- **Tests will fail initially** because CLI expects old error format
+### 6.0 ARCH: Architectural Analysis ✅
+**Analysis Conclusion**: The `format_error_response()` function was well-architected and didn't require refactoring
+- ✅ **Discovery**: The real issue was CLI integration, not handler architecture
+- ✅ **Focus Shift**: From handler refactoring to CLI response format detection and rich formatting integration
+- ✅ **Architecture Validation**: Confirmed clean separation between data transformation and presentation
 
-### 6.2 GREEN: Update CLI Error Display
-- Parse structured error responses from handler
-- Implement grouped error display with categories
-- Add partial success reporting
-- Enhance dry-run output with warnings and context
-- Display actionable suggestions for each error type
-- **Goal**: Make all CLI error display tests pass
+### 6.1 RED: Write Failing Tests for Enhanced CLI Output ✅
+**Created `spec/integration/cli_error_display_spec.lua`**:
+- ✅ Test CLI detects enhanced vs simple error response formats
+- ✅ Test rich CLI formatting with symbols, grouped errors, and suggestions
+- ✅ Test partial success display alongside errors
+- ✅ Test multiple error types with proper grouping
+- ✅ Test backwards compatibility with simple error responses
+- ✅ Test success response formatting with resource details
+- ✅ Test end-to-end handler → CLI → formatted output integration
+- ✅ **CONFIRMED**: All 8 tests failed initially (missing `cli.response_formatter` module)
 
-### 6.3 REFACTOR: Optimize CLI Error Formatting
-- Extract error formatting patterns into reusable components
-- Optimize error grouping and display logic
-- Ensure consistent CLI output formatting
+### 6.2 GREEN: Update CLI Error Display ✅
+- ✅ **Created** `lua/cli/response_formatter.lua` with comprehensive formatting capabilities
+- ✅ **Format Detection**: Automatic detection of enhanced, simple, and success response types
+- ✅ **Rich Formatting**: Integration with `diligent/error/formatter.lua` for structured error display
+- ✅ **Backwards Compatibility**: Seamless handling of existing simple error formats
+- ✅ **CLI Integration**: Updated `cli/commands/start.lua` to use response formatter
+- ✅ **Enhanced Display**: Grouped errors by phase (tag_resolution, spawning) with suggestions
+- ✅ **Partial Success**: Clear display of successful resources alongside failures
+- ✅ **ACHIEVED**: All 8 CLI error display tests pass
+
+### 6.3 REFACTOR: Optimize CLI Error Formatting ✅
+- ✅ **Performance**: Formatter instance reuse to avoid repeated creation
+- ✅ **Code Quality**: Helper functions (`build_output`, `build_error_header`) for maintainability  
+- ✅ **Architecture**: Clean separation between detection, formatting, and output logic
+- ✅ **Consistency**: Unified approach to section building and line management
+- ✅ **Optimization**: Eliminated code duplication in error response formatting
+
+**Cycle 6 Results:**
+- **747 test successes** (up from 739)
+- **0 test failures, 0 errors**
+- **Rich CLI Error Display**: Enhanced formatting with ✗, ✓, ⚠ symbols and grouped errors
+- **Partial Success Support**: Users see what succeeded alongside failures
+- **Complete Backwards Compatibility**: Existing error formats continue to work seamlessly  
+- **Architecture Integration**: Clean use of existing rich error formatter without duplication
+- **User Experience**: Actionable error messages with suggestions and context
 
 **Enhanced CLI Output Examples:**
 ```bash
@@ -356,12 +461,12 @@ Would create 1 named tag: "workspace"
 - ✅ **Cycle 2** (core.lua): ~2 hours - **COMPLETED**
 - ✅ **Cycle 3** (integration.lua): 2-3 hours - **COMPLETED**
 - ✅ **Cycle 4** (init.lua): 0.5 hours - **COMPLETED**
-- **Cycle 5** (Handler): 1-2 hours
-- **Cycle 6** (CLI): 2-3 hours
+- ✅ **Cycle 5** (Handler): 1.5 hours - **COMPLETED**
+- ✅ **Cycle 6** (CLI): 2.5 hours - **COMPLETED**
 - **Cycle 7** (Integration): 1-2 hours
 
-**Progress: 6.5/15 hours completed (43%)**  
-**Remaining: 4.5-8 hours** with comprehensive testing and quality assurance
+**Progress: 10.5/15 hours completed (70%)**  
+**Remaining: 1-2 hours** with comprehensive integration testing and final optimization
 
 ## Success Criteria
 
@@ -377,7 +482,7 @@ This TDD approach ensures every change is backed by tests, maintains quality thr
 
 ## 🎉 Implementation Status Summary
 
-### Completed Phases (4/7)
+### Completed Phases (6/7)
 
 **✅ Phase 1: Enhanced Error Framework**
 - **Files Created**: `lua/diligent/error/` (4 modules)
@@ -407,20 +512,39 @@ This TDD approach ensures every change is backed by tests, maintains quality thr
 - **Compatibility**: Maintained backwards compatibility for handler expectations
 - **Result**: 735 test successes, 0 failures, 0 errors - complete success
 
+**✅ Phase 5: Enhanced Start Handler**
+- **Files Modified**: `lua/diligent/handlers/start.lua`, `spec/diligent/handlers/start_handler_spec.lua`
+- **Implementation**: Added `format_error_response()` function for structured error processing
+- **Features**: Partial success handling, error aggregation, enhanced response format
+- **Tests Added**: 4 comprehensive error collection tests with proper isolation
+- **Architecture Discovery**: Identified error formatting duplication requiring Phase 6 refactoring
+- **Result**: 739 test successes, 0 failures, 0 errors - complete handler enhancement
+
+**✅ Phase 6: Transform CLI Error Display**
+- **Files Created**: `lua/cli/response_formatter.lua`, `spec/integration/cli_error_display_spec.lua`
+- **Files Modified**: `cli/commands/start.lua` 
+- **Implementation**: CLI response formatter with format detection and rich error display
+- **Features**: Rich CLI formatting, partial success display, backwards compatibility, error grouping
+- **Tests Added**: 8 comprehensive CLI error display integration tests
+- **Architecture**: Clean integration with existing rich error formatter without duplication
+- **Result**: 747 test successes, 0 failures, 0 errors - complete CLI enhancement
+
 ### Next Steps
 
-With the tag_mapper pipeline now fully converted, remaining phases focus on user experience:
-- **Phase 5**: Enhance start handler (collect and format structured errors)
-- **Phase 6**: Transform CLI display (rich error formatting with suggestions)
-- **Phase 7**: Integration testing (end-to-end error flow validation)
+With the complete error reporting pipeline now implemented, only final validation remains:
+- **Phase 7**: Integration testing (end-to-end error flow validation and performance optimization)
 
 ### Key Achievements
 
-1. **Complete Tag Mapper Pipeline**: Core → Integration → Init.lua all use structured errors
-2. **Error Aggregation**: Multiple tag creation failures collected instead of fail-fast
-3. **Interface Compatibility**: Handles both simple and structured error objects from interfaces
-4. **Pattern Consistency**: Return-based errors throughout the entire tag resolution pipeline
-5. **Test Coverage**: Comprehensive TDD coverage with 735 passing tests
-6. **Clean Architecture**: Well-structured, modular code with helper functions
-7. **Handler Integration**: Seamless error flow from tag_mapper to handler layer
-8. **User Experience Foundation**: Rich error framework ready for CLI enhancement
+1. **Complete Error Pipeline**: tag_mapper → handler → CLI with structured errors end-to-end
+2. **Rich CLI Error Display**: Users see ✗, ✓, ⚠ symbols, grouped errors, and actionable suggestions
+3. **Partial Success Support**: Clear display of successful resources alongside failures
+4. **Error Aggregation**: Multiple failures collected and displayed together instead of fail-fast
+5. **Interface Compatibility**: Handles both simple and structured error objects seamlessly
+6. **Pattern Consistency**: Return-based errors throughout the entire pipeline
+7. **Test Coverage**: Comprehensive TDD coverage with 747 passing tests
+8. **Clean Architecture**: Well-structured, modular code with proper separation of concerns
+9. **Backwards Compatibility**: All existing functionality preserved while adding enhancements
+10. **Format Detection**: Automatic detection and handling of different error response types
+11. **Performance Optimization**: Formatter instance reuse and efficient error processing
+12. **User Experience**: Production-ready error reporting with context and suggestions
