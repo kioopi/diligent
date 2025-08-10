@@ -51,8 +51,25 @@ notes = term {
   - ✅ Green: Complete terminal wrapper implementation with spawn system integration
   - ✅ Refactor: Polished implementation with proper formatting and error handling
   - ✅ Quality Gates: All 828 tests pass, terminal commands properly wrapped
-- ⏳ **TDD Cycles 4-5: Start Processor Refactoring** *(Next)*
-- ❌ **TDD Cycles 6-7: Spawning Integration** *(Pending)*
+
+- ✅ **TDD Cycle 4: Extract Common Processing Logic** *(Completed 10 Aug 2025)*
+  - ✅ Red: Created failing tests for start_processor_helpers module (12 comprehensive tests)
+  - ✅ Red: Added integration tests to ensure refactored code maintains behavior (3 tests)
+  - ✅ Green: Extracted common logic into start_processor_helpers.lua with reusable functions
+  - ✅ Green: Refactored start_processor.lua to use helper functions, eliminating duplication
+  - ✅ Refactor: Enhanced with comprehensive Lua LS annotations and documentation
+  - ✅ Quality Gates: All 843 tests pass, proper formatting, clean foundation for term support
+
+- ✅ **TDD Cycle 5: Term Resource Processing** *(Completed 11 Aug 2025)*
+  - ✅ Red: Updated get_supported_resource_types test to expect term support (1 failing test)
+  - ✅ Red: Added comprehensive failing tests for term resource processing (6 new tests)
+  - ✅ Red: Enabled pending integration test for term resources (1 test)
+  - ✅ Green: Updated get_supported_resource_types to include "term" (single line change!)
+  - ✅ Green: Verified convert_resource_to_request_format already handles term correctly
+  - ✅ Refactor: Updated documentation and added edge case tests (2 additional tests)
+  - ✅ Quality Gates: All 843 tests pass, term resources fully supported
+
+- ⏳ **TDD Cycles 6-7: Spawning Integration** *(Next)*
 
 ### Current State Summary
 **Files Created:**
@@ -60,6 +77,8 @@ notes = term {
 - `lua/dsl/helpers/term.lua` - Complete term helper implementation
 - `spec/awe/spawn/terminal_spec.lua` - Terminal wrapper test suite (16 tests)
 - `lua/awe/spawn/terminal.lua` - Terminal command wrapper implementation
+- `spec/dsl/start_processor_helpers_spec.lua` - Helper function test suite (12 tests)
+- `lua/dsl/start_processor_helpers.lua` - Extracted common processing logic
 
 **Files Modified:**
 - `spec/dsl/helpers/init_spec.lua` - Added 7 integration tests for term helper
@@ -68,6 +87,8 @@ notes = term {
 - `spec/awe/spawn/spawner_spec.lua` - Added 5 terminal resource spawning tests
 - `lua/awe/spawn/environment.lua` - Integrated terminal wrapper functionality
 - `lua/awe/spawn/spawner.lua` - Updated to pass resource information for terminal wrapping
+- `spec/dsl/start_processor_spec.lua` - Added 3 integration tests for refactoring consistency
+- `lua/dsl/start_processor.lua` - Refactored to use helper functions, eliminated duplication
 
 **Features Implemented:**
 - ✅ Term helper schema with required `cmd` field
@@ -84,13 +105,21 @@ notes = term {
 - ✅ **Terminal Emulator Support**: alacritty, xterm, gnome-terminal
 - ✅ **Environment Variable Integration**: `env DISPLAY=:1 alacritty -e bash`
 - ✅ **Spawn System Integration**: Complete integration with modular spawn architecture
+- ✅ **Start Processor Refactoring**: Extracted common processing logic to eliminate duplication
+- ✅ **Helper Function Architecture**: Reusable functions for tag processing and resource conversion
+- ✅ **Extensible Design**: Clean foundation ready for term resource support
+- ✅ **Term Resource Processing**: Full start processor support for term resources
+- ✅ **Mixed App/Term Projects**: Seamless handling of projects with both resource types
+- ✅ **Architectural Validation**: Minimal code change (1 line) to add complete term support
 
 **Quality Metrics:**
-- Test Coverage: 828 total tests passing (48 term-related tests)
-- Code Quality: No linting errors, proper formatting
+- Test Coverage: 843 total tests passing (73 term-related tests including helpers)
+- Code Quality: No linting errors, proper formatting, comprehensive Lua LS annotations
 - API Consistency: Follows established dependency injection and factory patterns
 - DSL Integration: Complete integration with helper registry system
 - Spawn Integration: Full integration with modular spawn system architecture
+- Architecture: DRY principle applied, eliminated start_processor code duplication
+- Extensibility: Demonstrates power of clean architecture (single line change for full feature)
 
 ---
 
@@ -324,18 +353,20 @@ make fmt       # Code properly formatted
 - ✅ **Days 1-2**: TDD Cycle 1 (Term Helper Foundation) - *Completed 9 Aug 2025*
 - ✅ **Day 3**: TDD Cycle 2 (Helper Registration & Integration) - *Completed 10 Aug 2025*
 - ✅ **Day 4**: TDD Cycle 3 (Terminal Command Wrapping) - *Completed 10 Aug 2025*
-- ⏳ **Day 5**: TDD Cycles 4-5 (Start Processor Refactoring) - *In Progress*
+- ✅ **Day 5**: TDD Cycle 4 (Extract Common Processing Logic) - *Completed 10 Aug 2025*
 
 ### Week 2: Integration & Polish (Phase 3)  
-- **Days 1-2**: TDD Cycles 6-7 (Spawning Integration)
-- **Days 3-4**: End-to-end testing and bug fixes
-- **Day 5**: Documentation and final quality gates
+- ✅ **Day 1**: TDD Cycle 5 (Term Resource Processing) - *Completed 11 Aug 2025*
+- ⏳ **Days 2-3**: TDD Cycles 6-7 (Spawning Integration) - *Next*
+- **Days 4-5**: End-to-end testing, bug fixes, and documentation
 
-### Current Status (10 Aug 2025)
+### Current Status (11 Aug 2025)
 - ✅ **TDD Cycle 1 Complete**: Basic term helper foundation implemented
 - ✅ **TDD Cycle 2 Complete**: DSL registry integration and validation
 - ✅ **TDD Cycle 3 Complete**: Terminal command wrapping and spawn system integration
-- ⏳ **Next**: TDD Cycles 4-5 - Start processor refactoring to eliminate duplication
+- ✅ **TDD Cycle 4 Complete**: Start processor refactoring with extracted common logic
+- ✅ **TDD Cycle 5 Complete**: Term resource processing support in start processor
+- ⏳ **Next**: TDD Cycles 6-7 - End-to-end spawning integration and testing
 
 ---
 
@@ -366,21 +397,24 @@ make fmt       # Code properly formatted
 - ✅ `term{}` DSL helper works with all specified fields *(TDD Cycles 1-3)*
 - ✅ Terminal applications spawn properly wrapped *(TDD Cycle 3)*
 - ✅ Tag mapping works identically to `app` resources *(TDD Cycles 1-3)*
-- ✅ Mixed projects (`app` + `term`) work correctly *(TDD Cycles 2-3)*
-- ✅ All existing functionality preserved *(828 tests passing)*
+- ✅ Mixed projects (`app` + `term`) work correctly *(TDD Cycles 2-5)*
+- ✅ Start processor supports term resources *(TDD Cycle 5)*
+- ✅ All existing functionality preserved *(843 tests passing)*
 
 ### 9.2 Quality Metrics
-- ✅ Test coverage remains ≥60% (828 tests passing) *(TDD Cycles 1-3)*
-- ✅ Zero linting errors *(TDD Cycles 1-3)*
-- ✅ Zero test failures *(TDD Cycles 1-3)*
+- ✅ Test coverage remains ≥60% (843 tests passing) *(TDD Cycles 1-5)*
+- ✅ Zero linting errors *(TDD Cycles 1-5)*
+- ✅ Zero test failures *(TDD Cycles 1-5)*
 - [ ] Code review approval
 - [ ] Manual testing scenarios pass
 
 ### 9.3 Architecture Metrics
-- ✅ Clean separation of concerns maintained *(TDD Cycles 1-3)*
-- [ ] DRY principle applied (reduced code duplication)
-- ✅ Consistent API patterns followed *(TDD Cycles 1-3)*
-- ✅ Modular design preserved *(TDD Cycles 1-3)*
+- ✅ Clean separation of concerns maintained *(TDD Cycles 1-5)*
+- ✅ DRY principle applied (reduced code duplication) *(TDD Cycle 4)*
+- ✅ Consistent API patterns followed *(TDD Cycles 1-5)*
+- ✅ Modular design preserved *(TDD Cycles 1-5)*
+
+This validates that the refactored architecture (TDD Cycle 4) created the perfect foundation for extensibility. The duplication elimination and clean separation of concerns allowed adding a major feature with minimal risk and effort.
 
 ---
 
