@@ -10,12 +10,25 @@ Handles environment variable processing for application spawning.
 local function create_environment(_interface)
   local environment = {}
 
-  ---Build command with environment variables
+  ---Build command with environment variables and terminal wrapping
   ---@param app string Application command
   ---@param env_vars table|nil Environment variables
-  ---@return string command Complete command with environment
-  function environment.build_command_with_env(app, env_vars)
+  ---@param resource_info table|nil Resource information (type, terminal, interactive)
+  ---@return string command Complete command with terminal wrapping and environment
+  function environment.build_command_with_env(app, env_vars, resource_info)
     local command = app
+
+    -- Apply terminal wrapping if this is a term resource
+    if resource_info and resource_info.type == "term" then
+      local create_terminal = require("awe.spawn.terminal")
+      local terminal_wrapper = create_terminal(_interface)
+
+      command = terminal_wrapper.wrap_command_for_terminal(
+        command,
+        resource_info.terminal,
+        resource_info.interactive
+      )
+    end
 
     -- Handle JSON decoding quirk and add environment variables if provided
     if

@@ -101,4 +101,90 @@ describe("awe.spawn.environment", function()
       assert.is_truthy(result:match("DEBUG=1"))
     end)
   end)
+
+  describe("terminal command integration", function()
+    it("should detect and wrap terminal commands", function()
+      local resource_info = {
+        type = "term",
+        terminal = "alacritty",
+        interactive = true,
+      }
+      local result =
+        environment.build_command_with_env("nvim notes.md", nil, resource_info)
+      assert.are.equal("alacritty -e nvim notes.md", result)
+    end)
+
+    it("should not wrap non-terminal commands", function()
+      local resource_info = {
+        type = "app",
+      }
+      local result =
+        environment.build_command_with_env("firefox", nil, resource_info)
+      assert.are.equal("firefox", result)
+    end)
+
+    it("should combine terminal wrapping with env vars", function()
+      local resource_info = {
+        type = "term",
+        terminal = "alacritty",
+        interactive = true,
+      }
+      local env_vars = { DISPLAY = ":1" }
+      local result =
+        environment.build_command_with_env("bash", env_vars, resource_info)
+      assert.are.equal("env DISPLAY=:1 alacritty -e bash", result)
+    end)
+
+    it("should handle different terminal emulators", function()
+      local resource_info = {
+        type = "term",
+        terminal = "xterm",
+        interactive = true,
+      }
+      local result =
+        environment.build_command_with_env("vim file.txt", nil, resource_info)
+      assert.are.equal("xterm -e vim file.txt", result)
+    end)
+
+    it(
+      "should work without resource_info parameter (backward compatibility)",
+      function()
+        local result = environment.build_command_with_env("firefox")
+        assert.are.equal("firefox", result)
+      end
+    )
+
+    it("should handle nil resource_info (backward compatibility)", function()
+      local env_vars = { DISPLAY = ":0" }
+      local result =
+        environment.build_command_with_env("firefox", env_vars, nil)
+      assert.are.equal("env DISPLAY=:0 firefox", result)
+    end)
+
+    it(
+      "should combine complex terminal wrapping with multiple env vars",
+      function()
+        local resource_info = {
+          type = "term",
+          terminal = "gnome-terminal",
+          interactive = true,
+        }
+        local env_vars = {
+          DISPLAY = ":1",
+          HOME = "/tmp/test",
+        }
+        local result = environment.build_command_with_env(
+          "bash --login",
+          env_vars,
+          resource_info
+        )
+
+        -- Check that all parts are present
+        assert.is_truthy(result:match("^env "))
+        assert.is_truthy(result:match("DISPLAY=:1"))
+        assert.is_truthy(result:match("HOME=/tmp/test"))
+        assert.is_truthy(result:match("gnome%-terminal %-%- bash %-%-login$"))
+      end
+    )
+  end)
 end)

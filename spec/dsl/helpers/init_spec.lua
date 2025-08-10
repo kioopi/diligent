@@ -14,11 +14,17 @@ describe("dsl.helpers.init", function()
       assert.is_function(app_helper)
     end)
 
+    it("should have term helper registered by default", function()
+      local term_helper = helpers.get("term")
+
+      assert.is_function(term_helper)
+    end)
+
     it("should list built-in helpers", function()
       local helper_names = helpers.list()
 
       assert.is_table(helper_names)
-      assert.are.same({ "app" }, helper_names)
+      assert.are.same({ "app", "term" }, helper_names)
     end)
   end)
 
@@ -44,7 +50,7 @@ describe("dsl.helpers.init", function()
 
       assert.is_table(helper_names)
       -- Should be sorted alphabetically
-      assert.are.same({ "app", "test" }, helper_names)
+      assert.are.same({ "app", "term", "test" }, helper_names)
     end)
 
     it("should validate helper name is string", function()
@@ -140,6 +146,17 @@ describe("dsl.helpers.init", function()
       assert.are.same({ "dir", "tag", "reuse" }, schema.optional)
     end)
 
+    it("should return term schema", function()
+      local schema = helpers.get_schema("term")
+
+      assert.is_table(schema)
+      assert.are.same({ "cmd" }, schema.required)
+      assert.are.same(
+        { "dir", "tag", "interactive", "terminal" },
+        schema.optional
+      )
+    end)
+
     it("should return nil for unknown helper", function()
       local schema = helpers.get_schema("unknown")
 
@@ -167,6 +184,33 @@ describe("dsl.helpers.init", function()
       }
 
       local success, error_msg = helpers.validate_resource(resource_spec, "app")
+
+      assert.is_false(success)
+      assert.is_string(error_msg)
+      assert.matches("cmd field is required", error_msg)
+    end)
+
+    it("should validate term resource", function()
+      local resource_spec = {
+        cmd = "bash",
+        terminal = "xterm",
+      }
+
+      local success, error_msg =
+        helpers.validate_resource(resource_spec, "term")
+
+      assert.is_true(success)
+      assert.is_nil(error_msg)
+    end)
+
+    it("should return error for invalid term resource", function()
+      local resource_spec = {
+        -- Missing required cmd field
+        terminal = "xterm",
+      }
+
+      local success, error_msg =
+        helpers.validate_resource(resource_spec, "term")
 
       assert.is_false(success)
       assert.is_string(error_msg)
@@ -203,6 +247,7 @@ describe("dsl.helpers.init", function()
       local env = helpers.create_env()
 
       assert.is_function(env.app)
+      assert.is_function(env.term)
     end)
 
     it("should include registered helpers", function()
@@ -255,6 +300,34 @@ describe("dsl.helpers.init", function()
       assert.are.equal("app", result.resources.editor.type)
       assert.are.equal("gedit", result.resources.editor.cmd)
     end)
+
+    it("should work with term in DSL execution", function()
+      local env = helpers.create_env()
+
+      -- Simulate DSL execution with term helper
+      local dsl_code = [[
+        return {
+          name = "test-project",
+          resources = {
+            terminal = term {
+              cmd = "bash",
+              tag = 2
+            }
+          }
+        }
+      ]]
+
+      local chunk = load(dsl_code, "test", "t", env)
+      assert.is_function(chunk)
+
+      local result = chunk()
+      assert.is_table(result)
+      assert.are.equal("test-project", result.name)
+      assert.is_table(result.resources.terminal)
+      assert.are.equal("term", result.resources.terminal.type)
+      assert.are.equal("bash", result.resources.terminal.cmd)
+      assert.are.equal(2, result.resources.terminal.tag)
+    end)
   end)
 
   describe("list", function()
@@ -268,7 +341,7 @@ describe("dsl.helpers.init", function()
       local names = helpers.list()
 
       -- Should be sorted alphabetically
-      assert.are.same({ "alpha", "app", "zebra" }, names)
+      assert.are.same({ "alpha", "app", "term", "zebra" }, names)
     end)
   end)
 end)

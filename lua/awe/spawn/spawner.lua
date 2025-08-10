@@ -14,10 +14,11 @@ local function create_spawner(interface)
   ---@param app string Application command
   ---@param target_tag table Resolved tag object with index and name properties
   ---@param config table Configuration options
+  ---@param resource_info table|nil Resource information (type, terminal, interactive)
   ---@return number|nil pid Process ID
   ---@return string|nil snid Spawn notification ID
   ---@return string message Result message
-  function spawner.spawn_with_properties(app, target_tag, config)
+  function spawner.spawn_with_properties(app, target_tag, config, resource_info)
     config = config or {}
 
     -- Handle JSON decoding quirk where {} becomes false
@@ -40,7 +41,8 @@ local function create_spawner(interface)
     -- Step 2: Build command with environment variables using environment module
     local create_environment = require("awe.spawn.environment")
     local environment = create_environment(interface)
-    local command = environment.build_command_with_env(app, config.env_vars)
+    local command =
+      environment.build_command_with_env(app, config.env_vars, resource_info)
 
     -- Step 3: Spawn application using interface
     local pid, snid

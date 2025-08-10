@@ -12,10 +12,14 @@ local registry = {}
 
 -- Load built-in helpers
 local app_helper = require("dsl.helpers.app")
+local term_helper = require("dsl.helpers.term")
 
 -- Register built-in helpers
 registry.app = function(spec)
   return app_helper.create(spec)
+end
+registry.term = function(spec)
+  return term_helper.create(spec)
 end
 
 ---Register a helper function
@@ -70,11 +74,9 @@ function helpers.get_schema(name)
   if name == "app" then
     return app_helper.schema
   end
-
-  -- Future helpers would be added here
-  -- if name == "term" then
-  --   return term_helper.schema
-  -- end
+  if name == "term" then
+    return term_helper.schema
+  end
 
   return nil
 end
@@ -88,11 +90,9 @@ function helpers.validate_resource(resource_spec, resource_type)
   if resource_type == "app" then
     return app_helper.validate(resource_spec)
   end
-
-  -- Future helper validation would be added here
-  -- if resource_type == "term" then
-  --   return term_helper.validate(resource_spec)
-  -- end
+  if resource_type == "term" then
+    return term_helper.validate(resource_spec)
+  end
 
   return false, "unknown resource type: " .. tostring(resource_type)
 end
@@ -129,6 +129,9 @@ function helpers._clear_registry()
   -- Re-register built-in helpers
   registry.app = function(spec)
     return app_helper.create(spec)
+  end
+  registry.term = function(spec)
+    return term_helper.create(spec)
   end
 end
 

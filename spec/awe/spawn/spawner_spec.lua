@@ -198,4 +198,117 @@ describe("awe.spawn.spawner", function()
       assert.are.equal(768, spawn_call.properties.height)
     end)
   end)
+
+  describe("terminal resource spawning", function()
+    it("should spawn terminal commands with proper wrapping", function()
+      -- Configure mock to return success
+      mock_interface.set_spawn_config({
+        success = true,
+        pid = 5678,
+        snid = "term-snid",
+      })
+
+      -- Create a mock tag object (normally from tag_mapper)
+      local target_tag = { index = 2, name = "editor" }
+
+      -- Resource info for a terminal application
+      local resource_info = {
+        type = "term",
+        terminal = "alacritty",
+        interactive = true,
+      }
+
+      local pid, snid, msg = spawner.spawn_with_properties(
+        "nvim notes.md",
+        target_tag,
+        {},
+        resource_info
+      )
+
+      -- Verify the terminal wrapper was called
+      local spawn_call = mock_interface.get_last_spawn_call()
+      assert.is_not_nil(spawn_call)
+      assert.are.equal("alacritty -e nvim notes.md", spawn_call.command)
+
+      -- Verify return values
+      assert.are.equal(5678, pid)
+      assert.are.equal("term-snid", snid)
+      assert.matches("SUCCESS.*nvim notes.md.*5678.*editor.*2", msg)
+    end)
+
+    it("should combine terminal wrapping with env vars", function()
+      mock_interface.set_spawn_config({
+        success = true,
+        pid = 9999,
+        snid = "env-term-snid",
+      })
+
+      local target_tag = { index = 1, name = "terminal" }
+      local config = {
+        env_vars = { DISPLAY = ":1", HOME = "/tmp" },
+      }
+      local resource_info = {
+        type = "term",
+        terminal = "xterm",
+        interactive = true,
+      }
+
+      local pid, snid, msg =
+        spawner.spawn_with_properties("bash", target_tag, config, resource_info)
+
+      local spawn_call = mock_interface.get_last_spawn_call()
+      assert.is_not_nil(spawn_call)
+
+      -- Should have both env vars and terminal wrapping
+      assert.is_truthy(spawn_call.command:match("^env "))
+      assert.is_truthy(spawn_call.command:match("DISPLAY=:1"))
+      assert.is_truthy(spawn_call.command:match("HOME=/tmp"))
+      assert.is_truthy(spawn_call.command:match("xterm %-e bash$"))
+    end)
+
+    it("should work without resource_info (backward compatibility)", function()
+      mock_interface.set_spawn_config({
+        success = true,
+        pid = 1111,
+        snid = "compat-snid",
+      })
+
+      local target_tag = { index = 1, name = "app" }
+      local pid, snid, msg =
+        spawner.spawn_with_properties("firefox", target_tag, {})
+
+      local spawn_call = mock_interface.get_last_spawn_call()
+      assert.is_not_nil(spawn_call)
+      assert.are.equal("firefox", spawn_call.command) -- No wrapping
+
+      assert.are.equal(1111, pid)
+      assert.are.equal("compat-snid", snid)
+    end)
+
+    it("should handle app resources without terminal wrapping", function()
+      mock_interface.set_spawn_config({
+        success = true,
+        pid = 2222,
+        snid = "app-snid",
+      })
+
+      local target_tag = { index = 3, name = "browser" }
+      local resource_info = {
+        type = "app", -- Not a terminal resource
+      }
+
+      local pid, snid, msg = spawner.spawn_with_properties(
+        "firefox --new-window",
+        target_tag,
+        {},
+        resource_info
+      )
+
+      local spawn_call = mock_interface.get_last_spawn_call()
+      assert.is_not_nil(spawn_call)
+      assert.are.equal("firefox --new-window", spawn_call.command) -- No terminal wrapping
+
+      assert.are.equal(2222, pid)
+    end)
+  end)
 end)
