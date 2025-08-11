@@ -45,6 +45,11 @@ local function create_configuration(interface)
       properties.height = config.height
     end
 
+    -- Add working directory
+    if config.working_dir then
+      properties.working_dir = config.working_dir
+    end
+
     return properties
   end
 

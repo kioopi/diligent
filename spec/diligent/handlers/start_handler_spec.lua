@@ -929,6 +929,311 @@ describe("Start Handler", function()
     end)
   end)
 
+  describe("term resource integration", function()
+    before_each(function()
+      mock_interface.reset()
+    end)
+
+    it("should wrap terminal commands for term resources", function()
+      local payload = {
+        project_name = "term-test",
+        resources = {
+          {
+            name = "shell",
+            command = "bash",
+            tag_spec = "0",
+            terminal = "alacritty",
+            interactive = true,
+          },
+        },
+      }
+
+      local success, result = handler.execute(payload)
+      assert.is_true(success, "Handler execution should succeed")
+      assert.equals(1, result.total_spawned)
+
+      -- Verify command was wrapped for terminal execution
+      local spawn_call = mock_interface.get_last_spawn_call()
+      assert.is_truthy(
+        spawn_call.command:match("alacritty %-e bash$"),
+        "Command should be wrapped: " .. spawn_call.command
+      )
+    end)
+
+    it("should not wrap commands for app resources", function()
+      local payload = {
+        project_name = "app-test",
+        resources = {
+          {
+            name = "editor",
+            command = "gedit",
+            tag_spec = "0",
+            reuse = true,
+          },
+        },
+      }
+
+      local success, result = handler.execute(payload)
+      assert.is_true(success, "Handler execution should succeed")
+
+      -- Verify command was not wrapped for app resource
+      local spawn_call = mock_interface.get_last_spawn_call()
+      assert.equals(
+        "gedit",
+        spawn_call.command,
+        "App command should not be wrapped"
+      )
+    end)
+
+    it("should handle mixed app and term resources correctly", function()
+      local payload = {
+        project_name = "mixed-test",
+        resources = {
+          {
+            name = "editor",
+            command = "gedit",
+            tag_spec = "0",
+            reuse = false,
+          },
+          {
+            name = "shell",
+            command = "bash",
+            tag_spec = "1",
+            terminal = "xterm",
+            interactive = false,
+          },
+        },
+      }
+
+      local success, result = handler.execute(payload)
+      assert.is_true(success, "Handler execution should succeed")
+      assert.equals(2, result.total_spawned)
+
+      local spawn_calls = mock_interface.get_spawn_calls()
+      assert.equals(2, #spawn_calls)
+
+      -- First call (app) should not be wrapped
+      assert.equals(
+        "gedit",
+        spawn_calls[1].command,
+        "App command should not be wrapped"
+      )
+
+      -- Second call (term) should be wrapped with xterm
+      assert.is_truthy(
+        spawn_calls[2].command:match("xterm %-e bash$"),
+        "Term command should be wrapped: " .. spawn_calls[2].command
+      )
+    end)
+
+    it("should handle term resource with default terminal", function()
+      local payload = {
+        project_name = "term-defaults-test",
+        resources = {
+          {
+            name = "shell",
+            command = "nvim",
+            tag_spec = "0",
+            terminal = "alacritty", -- Default terminal
+            interactive = true, -- Default interactive
+          },
+        },
+      }
+
+      local success, result = handler.execute(payload)
+      assert.is_true(success, "Handler execution should succeed")
+
+      local spawn_call = mock_interface.get_last_spawn_call()
+      assert.is_truthy(
+        spawn_call.command:match("alacritty %-e nvim$"),
+        "Command should be wrapped with default terminal: "
+          .. spawn_call.command
+      )
+    end)
+  end)
+
+  describe("end-to-end DSL integration", function()
+    local original_dsl_parser
+    local original_start_processor
+
+    before_each(function()
+      mock_interface.reset()
+
+      -- Store originals for restoration
+      original_dsl_parser = package.loaded["dsl.parser"]
+      original_start_processor = package.loaded["dsl.start_processor"]
+    end)
+
+    after_each(function()
+      -- Restore originals
+      package.loaded["dsl.parser"] = original_dsl_parser
+      package.loaded["dsl.start_processor"] = original_start_processor
+    end)
+
+    it("should handle complete DSL term resource flow", function()
+      -- Test the complete DSL → start_processor → start_handler → spawn flow
+      local dsl_str = [[
+        return {
+          name = "term-integration-test",
+          resources = {
+            shell = term {
+              cmd = "bash",
+              tag = 1,
+              terminal = "alacritty",
+              interactive = true,
+            },
+          }
+        }
+      ]]
+
+      -- Parse DSL
+      local parser = require("dsl.parser")
+      local success, dsl_project = parser.compile_dsl(dsl_str)
+      assert.is_true(success, "DSL parsing should succeed")
+
+      -- Convert to start request format
+      local start_processor = require("dsl.start_processor")
+      local start_request =
+        start_processor.convert_project_to_start_request(dsl_project)
+
+      assert.equals("term-integration-test", start_request.project_name)
+      assert.equals(1, #start_request.resources)
+
+      local resource = start_request.resources[1]
+      assert.equals("shell", resource.name)
+      assert.equals("bash", resource.command)
+      assert.equals("alacritty", resource.terminal)
+      assert.equals(true, resource.interactive)
+
+      -- Execute through start handler
+      local success, result = handler.execute(start_request)
+      assert.is_true(success, "Start handler should succeed")
+      assert.equals(1, result.total_spawned)
+
+      -- Verify terminal wrapping occurred
+      local spawn_call = mock_interface.get_last_spawn_call()
+      assert.is_truthy(
+        spawn_call.command:match("alacritty %-e bash$"),
+        "Command should be terminal wrapped: " .. spawn_call.command
+      )
+    end)
+
+    it("should handle mixed DSL app and term resources", function()
+      local dsl_str = [[
+        return {
+          name = "mixed-integration-test",
+          resources = {
+            editor = app {
+              cmd = "gedit", 
+              tag = 0,
+              reuse = true,
+            },
+            shell = term {
+              cmd = "nvim notes.md",
+              tag = 1, 
+              terminal = "xterm",
+              interactive = false,
+            },
+          }
+        }
+      ]]
+
+      -- Full pipeline: DSL → start_processor → start_handler
+      local parser = require("dsl.parser")
+      local success, dsl_project = parser.compile_dsl(dsl_str)
+      assert.is_true(success, "DSL parsing should succeed")
+
+      local start_processor = require("dsl.start_processor")
+      local start_request =
+        start_processor.convert_project_to_start_request(dsl_project)
+
+      local success, result = handler.execute(start_request)
+      assert.is_true(success, "Mixed resources should spawn successfully")
+      assert.equals(2, result.total_spawned)
+
+      local spawn_calls = mock_interface.get_spawn_calls()
+      assert.equals(2, #spawn_calls)
+
+      -- Find calls by command content
+      local gedit_call, nvim_call
+      for _, call in ipairs(spawn_calls) do
+        if call.command:find("gedit") then
+          gedit_call = call
+        elseif call.command:find("nvim") then
+          nvim_call = call
+        end
+      end
+
+      assert.is_not_nil(gedit_call, "Should have gedit spawn call")
+      assert.is_not_nil(nvim_call, "Should have nvim spawn call")
+
+      -- App resource should not be wrapped
+      assert.equals(
+        "gedit",
+        gedit_call.command,
+        "App command should not be wrapped"
+      )
+
+      -- Term resource should be wrapped
+      assert.is_truthy(
+        nvim_call.command:match("xterm %-e nvim notes%.md$"),
+        "Term command should be wrapped: " .. nvim_call.command
+      )
+    end)
+
+    it("should handle term resource with working directory", function()
+      local dsl_str = [[
+        return {
+          name = "term-workdir-test",
+          resources = {
+            dev_shell = term {
+              cmd = "bash",
+              dir = "/home/user/projects",
+              tag = 2,
+              terminal = "gnome-terminal",
+            },
+          }
+        }
+      ]]
+
+      local parser = require("dsl.parser")
+      local success, dsl_project = parser.compile_dsl(dsl_str)
+      assert.is_true(success, "DSL parsing should succeed")
+
+      local start_processor = require("dsl.start_processor")
+      local start_request =
+        start_processor.convert_project_to_start_request(dsl_project)
+
+      -- Debug: check the start_request structure
+      local resource = start_request.resources[1]
+      assert.equals("dev_shell", resource.name)
+      assert.equals("bash", resource.command)
+      assert.equals(
+        "/home/user/projects",
+        resource.working_dir,
+        "Start processor should include working_dir"
+      )
+
+      local success, result = handler.execute(start_request)
+      assert.is_true(
+        success,
+        "Should spawn successfully with working directory"
+      )
+
+      -- Verify terminal wrapping and working directory config
+      local spawn_call = mock_interface.get_last_spawn_call()
+      assert.is_truthy(
+        spawn_call.command:match("gnome%-terminal %-%- bash$"),
+        "Should wrap with gnome-terminal: " .. spawn_call.command
+      )
+      assert.equals(
+        "/home/user/projects",
+        spawn_call.properties.working_dir,
+        "Should set working directory"
+      )
+    end)
+  end)
+
   describe("tag resolution via tag_mapper", function()
     before_each(function()
       mock_interface.reset()

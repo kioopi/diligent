@@ -81,6 +81,14 @@ describe("awe.spawn.configuration", function()
       assert.are.equal(600, result.height)
     end)
 
+    it("should set working_dir when provided", function()
+      local result = configuration.build_spawn_properties(
+        nil,
+        { working_dir = "/home/user/projects" }
+      )
+      assert.are.equal("/home/user/projects", result.working_dir)
+    end)
+
     it("should combine all properties", function()
       local mock_tag = { name = "work", index = 2 }
       local config = {
@@ -88,6 +96,7 @@ describe("awe.spawn.configuration", function()
         width = 1024,
         height = 768,
         placement = "centered",
+        working_dir = "/tmp/workspace",
       }
 
       local result = configuration.build_spawn_properties(mock_tag, config)
@@ -96,6 +105,7 @@ describe("awe.spawn.configuration", function()
       assert.is_true(result.floating)
       assert.are.equal(1024, result.width)
       assert.are.equal(768, result.height)
+      assert.are.equal("/tmp/workspace", result.working_dir)
       assert.is_not_nil(result.placement)
     end)
 

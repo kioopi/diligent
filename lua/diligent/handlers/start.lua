@@ -20,13 +20,26 @@ function start_handler.create(awe_module)
 
   -- Helper function to attempt spawning a single resource
   local function attempt_single_spawn(resource, resolved_tag, awe_instance)
+    -- Detect resource type and build resource_info for spawn system
+    -- Term resources have terminal/interactive fields, app resources have reuse field
+    local resource_info = nil
+    if resource.terminal or resource.interactive ~= nil then
+      -- This is a term resource - pass terminal configuration to spawn system
+      resource_info = {
+        type = "term",
+        terminal = resource.terminal,
+        interactive = resource.interactive,
+      }
+    end
+
     local pid, snid, message = awe_instance.spawn.spawner.spawn_with_properties(
       resource.command,
       resolved_tag,
       {
         working_dir = resource.working_dir,
-        reuse = resource.reuse,
-      }
+        reuse = resource.reuse, -- Only used for app resources
+      },
+      resource_info -- Only passed for term resources
     )
 
     if pid and type(pid) == "number" then
